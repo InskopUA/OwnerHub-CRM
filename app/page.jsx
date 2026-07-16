@@ -1383,7 +1383,7 @@ function MakeGuideModal({ webhookUrl, token, onClose }) {
           <div className="guide-step"><b>2. Make trigger</b><p>В Make создай Scenario и добавь Facebook Lead Ads trigger: New Lead / Watch Leads. Подключи Facebook account, выбери Page и Lead Form.</p></div>
           <div className="guide-step"><b>3. Get Lead Details</b><p>Добавь Facebook Lead Ads → Get Lead Details и передай туда Lead ID из первого модуля.</p></div>
           <div className="guide-step"><b>4. HTTP request</b><p>Добавь HTTP → Make a request.</p><pre>{`Method: POST\nURL: ${webhookUrl}\nHeaders:\nContent-Type: application/json\nx-ownerhub-token: ${token || "YOUR_GENERATED_TOKEN"}`}</pre></div>
-          <div className="guide-step"><b>5. JSON body</b><p>В Body type выбери Raw / JSON и замапь поля из Get Lead Details.</p><pre>{`{
+          <div className="guide-step"><b>5. JSON body</b><p>В Body type выбери Raw / JSON. Если Make показывает массив полей формы, отправь его как field_data. Если нет, замапь доступные поля из Get Lead Details.</p><pre>{`{
   "name": "{{Full Name}}",
   "phone": "{{Phone Number}}",
   "email": "{{Email}}",
@@ -1397,6 +1397,7 @@ function MakeGuideModal({ webhookUrl, token, onClose }) {
   "trailerMake": "{{Trailer Make}}",
   "notes": "Imported from Make"
 }`}</pre></div>
+          <div className="guide-step"><b>Smart mapping</b><p>Webhook понимает разные названия полей: full_name, phone_number, city, CDL, truck_make, trailer_make, а также русские названия. Нераспознанные ответы сохраняются в комментарии кандидата.</p></div>
           <div className="guide-step"><b>6. Test</b><p>Нажми Run once в Make и отправь тестовый лид. Успешный ответ будет ok: true. Новый кандидат появится в Candidates.</p></div>
         </div>
         <div className="modal-foot"><button className="btn btn-primary" onClick={onClose}>Готово</button></div>

@@ -22,35 +22,64 @@ const toNumberOrNull = (value) => {
   return Number.isFinite(number) ? number : null;
 };
 
-const canonicalFieldNames = {
-  fullname: "name",
-  name: "name",
-  firstname: "firstName",
-  lastname: "lastName",
-  phonenumber: "phone",
-  phone: "phone",
-  mobile: "phone",
-  email: "email",
-  emailaddress: "email",
-  city: "city",
-  state: "state",
-  zipcode: "zip",
-  postalcode: "zip",
-  zip: "zip",
-  workpreference: "workPreference",
-  worktype: "workPreference",
-  truckmake: "truckMake",
-  truckmodel: "truckModel",
-  truckyear: "truckYear",
-  trailermake: "trailerMake",
-  trailermodel: "trailerModel",
-  traileryear: "trailerYear",
-  notes: "notes",
-  message: "notes",
-  comments: "notes"
-};
+const normalizeFieldName = (name) =>
+  String(name || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}]/gu, "");
 
-const normalizeFieldName = (name) => String(name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const fieldAliasEntries = [
+  [["full_name", "full name", "name", "driver name", "contact name", "фио", "имя", "повне ім'я", "ім'я"], "name"],
+  [["first_name", "first name", "firstname", "имя водителя", "имя кандидата"], "firstName"],
+  [["last_name", "last name", "lastname", "фамилия"], "lastName"],
+  [["phone_number", "phone", "mobile", "cell", "telephone", "tel", "номер телефона", "телефон", "мобильный", "мобільний"], "phone"],
+  [["email", "email address", "e-mail", "почта", "емейл", "пошта"], "email"],
+  [["city", "город", "місто"], "city"],
+  [["state", "state code", "province", "штат", "область"], "state"],
+  [["zip", "zip code", "zipcode", "postal code", "индекс", "почтовый индекс"], "zip"],
+  [["work_preference", "work preference", "work type", "preferred work", "local or otr", "otr local", "формат работы", "тип работы"], "workPreference"],
+  [["home_time", "home time", "hometime", "home time preference", "домой", "home weekly"], "homeTime"],
+  [["start_date", "start date", "ready to start", "available date", "когда готов", "дата старта"], "startDate"],
+  [["days_per_week", "days per week", "working days", "дней в неделю"], "daysPerWeek"],
+  [["expected_gross", "expected gross", "weekly gross", "gross", "ожидаемый gross", "доход"], "expectedGross"],
+  [["cdl", "cdl license", "commercial license"], "cdl"],
+  [["license_type", "license type", "license class", "тип лицензии"], "licenseType"],
+  [["experience_years", "experience years", "driving experience", "years experience", "опыт", "стаж"], "experienceYears"],
+  [["car_hauling_years", "car hauling years", "car hauling experience", "опыт автовоз", "опыт car hauling"], "carHaulingYears"],
+  [["two_car_experience", "two car experience", "2 car experience", "2car", "two car", "опыт 2 car"], "twoCarExperience"],
+  [["accidents", "accident", "аварии", "дтп"], "accidents"],
+  [["violations", "tickets", "moving violations", "нарушения", "тикеты"], "violations"],
+  [["medical_card", "medical card", "dot medical card", "мед карта"], "medicalCard"],
+  [["previous_insurance_rejection", "insurance rejection", "insurance denied", "отказ insurance"], "previousInsuranceRejection"],
+  [["truck_make", "truck make", "truck", "truck brand", "марка трака", "марка грузовика"], "truckMake"],
+  [["truck_model", "truck model", "модель трака", "модель грузовика"], "truckModel"],
+  [["truck_year", "truck year", "год трака", "год грузовика"], "truckYear"],
+  [["truck_vin", "truck vin", "vin truck"], "truckVin"],
+  [["truck_gvwr", "truck gvwr", "gvwr truck"], "truckGvwr"],
+  [["truck_fuel", "truck fuel", "fuel"], "truckFuel"],
+  [["truck_condition", "truck condition"], "truckCondition"],
+  [["truck_inspection", "truck inspection"], "truckInspection"],
+  [["trailer_make", "trailer make", "trailer", "марка трейлера"], "trailerMake"],
+  [["trailer_model", "trailer model", "модель трейлера"], "trailerModel"],
+  [["trailer_year", "trailer year", "год трейлера"], "trailerYear"],
+  [["trailer_vin", "trailer vin", "vin trailer"], "trailerVin"],
+  [["trailer_gvwr", "trailer gvwr", "gvwr trailer"], "trailerGvwr"],
+  [["trailer_length", "trailer length", "length"], "trailerLength"],
+  [["trailer_capacity", "trailer capacity", "capacity", "cars capacity", "сколько машин"], "trailerCapacity"],
+  [["trailer_type", "trailer type", "open enclosed"], "trailerType"],
+  [["notes", "note", "message", "comment", "comments", "additional info", "extra info", "комментарий", "заметка"], "notes"]
+];
+
+const canonicalFieldNames = Object.fromEntries(
+  fieldAliasEntries.flatMap(([aliases, canonicalName]) =>
+    aliases.map((alias) => [normalizeFieldName(alias), canonicalName])
+  )
+);
+
+const ignoredRawFieldNames = new Set(
+  ["token", "secret", "xownerhubtoken", "xownerhubsecret", "xmakesecret", "workspaceid", "workspace_id"].map(normalizeFieldName)
+);
 
 const valueToString = (value) => {
   if (value === undefined || value === null) return "";
@@ -64,40 +93,74 @@ const valueToString = (value) => {
 };
 
 const assignLeadField = (target, rawName, value) => {
+  const normalizedName = normalizeFieldName(rawName);
+  if (!normalizedName || ignoredRawFieldNames.has(normalizedName)) return null;
+
   const key = canonicalFieldNames[normalizeFieldName(rawName)];
   const cleanValue = valueToString(value);
-  if (key && cleanValue && !target[key]) target[key] = cleanValue;
+  if (!cleanValue) return null;
+
+  if (key && !target[key]) target[key] = cleanValue;
+  return { name: String(rawName).trim(), value: cleanValue, key, mapped: Boolean(key) };
 };
 
-const mergeNamedFieldArray = (target, fields) => {
+const mergeNamedFieldArray = (target, fields, collectedFields) => {
   if (!Array.isArray(fields)) return;
 
   fields.forEach((field) => {
     const rawName = field?.name || field?.key || field?.label || field?.field_name;
     const value = field?.values ?? field?.value ?? field?.answer ?? field?.answers;
-    assignLeadField(target, rawName, value);
+    const collected = assignLeadField(target, rawName, value);
+    if (collected) collectedFields.push(collected);
   });
 };
 
 const normalizeLeadPayload = (body) => {
   const normalized = {};
+  const collectedFields = [];
 
   [
     body?.field_data,
     body?.fieldData,
     body?.custom_fields,
     body?.customFields,
+    body?.fields,
+    body?.answers,
     body?.data?.field_data,
+    body?.data?.custom_fields,
+    body?.data?.fields,
+    body?.data?.answers,
     body?.lead?.field_data,
-    body?.response?.field_data
-  ].forEach((fields) => mergeNamedFieldArray(normalized, fields));
+    body?.lead?.custom_fields,
+    body?.lead?.fields,
+    body?.lead?.answers,
+    body?.response?.field_data,
+    body?.response?.custom_fields,
+    body?.response?.fields,
+    body?.response?.answers
+  ].forEach((fields) => mergeNamedFieldArray(normalized, fields, collectedFields));
 
   Object.entries(body || {}).forEach(([key, value]) => {
-    if (value !== null && typeof value === "object" && !Array.isArray(value)) return;
-    assignLeadField(normalized, key, value);
+    if (value !== null && typeof value === "object") return;
+    const collected = assignLeadField(normalized, key, value);
+    if (collected) collectedFields.push(collected);
   });
 
-  return { ...body, ...normalized };
+  [body?.data, body?.lead, body?.response].forEach((container) => {
+    if (!container || typeof container !== "object" || Array.isArray(container)) return;
+    Object.entries(container).forEach(([key, value]) => {
+      if (value !== null && typeof value === "object") return;
+      const collected = assignLeadField(normalized, key, value);
+      if (collected) collectedFields.push(collected);
+    });
+  });
+
+  return {
+    ...body,
+    ...normalized,
+    _rawLeadFields: collectedFields,
+    _unmappedLeadFields: collectedFields.filter((field) => !field.mapped)
+  };
 };
 
 const splitName = (body) => {
@@ -208,7 +271,16 @@ async function resolveLegacyWorkspace(body, request) {
 
 function mapLead(body, workspaceId) {
   const { firstName, lastName } = splitName(body);
-  const notes = pick(body, ["notes", "note", "message", "comment", "comments"]);
+  const baseNotes = pick(body, ["notes", "note", "message", "comment", "comments"]);
+  const extraFields = Array.isArray(body?._unmappedLeadFields)
+    ? body._unmappedLeadFields
+        .filter((field) => field.name && field.value)
+        .map((field) => `${field.name}: ${field.value}`)
+    : [];
+  const notes = [
+    baseNotes,
+    extraFields.length ? `Additional lead fields:\n${extraFields.join("\n")}` : ""
+  ].filter(Boolean).join("\n\n");
   const source = pick(body, ["source", "leadSource", "lead_source", "utm_source"], "Make");
   const status = pick(body, ["status"], "new");
 
