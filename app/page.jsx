@@ -1181,7 +1181,7 @@ function CallsView({ db, ui, setUi, saveCandidate, createFollowup, notify, openN
           <span className="script-label">● HR говорит</span>
           <div className="script-text">{(step.say?.[lang] || step.say?.ru || "").replace("[HR NAME]", db.settings.hrName).replace("[COMPANY]", db.settings.companyName)}</div>
           {step.help ? <div className="script-help">{step.help}</div> : null}
-          {step.finish ? <div className="script-help success"><strong>Результат готов к сохранению.</strong><br />Проверьте live summary и завершите звонок.</div> : step.type === "options" ? <div className="answer-options">{step.options.map((option) => <button className="btn answer-btn" key={option.v} onClick={() => advanceOption(step.key, option.v, option.next)}>{option[lang] || option.ru}</button>)}</div> : <form onSubmit={advanceFields} className="call-fields"><div className="field-grid">{step.fields.map((field) => <CallField key={field[0]} candidate={candidate} field={field} />)}</div><div className="call-footer"><BackButton candidate={candidate} persist={persist} /><button className="btn btn-primary">Сохранить и продолжить →</button></div></form>}
+          {step.finish ? <div className="script-help success"><strong>Результат готов к сохранению.</strong><br />Проверьте live summary и завершите звонок.</div> : step.type === "options" ? <div className="answer-options">{step.options.map((option) => <button className="btn answer-btn" key={option.v} onClick={() => advanceOption(step.key, option.v, option.next)}>{option[lang] || option.ru}</button>)}</div> : <form onSubmit={advanceFields} className="call-fields"><CallFieldsGrid candidate={candidate} fields={step.fields} /><div className="call-footer"><BackButton candidate={candidate} persist={persist} /><button className="btn btn-primary">Сохранить и продолжить →</button></div></form>}
           {step.type !== "fields" ? <div className="call-footer"><BackButton candidate={candidate} persist={persist} />{step.finish ? <button className="btn btn-primary" onClick={completeCall}>Завершить и сохранить</button> : <span className="section-note">Выберите ответ кандидата</span>}</div> : null}
         </div>
       </div>
@@ -1200,6 +1200,23 @@ function BackButton({ candidate, persist }) {
     next.call.stepId = next.call.history.pop();
     persist(next, "Шаг звонка изменён");
   }}>← Назад</button>;
+}
+
+function CallFieldsGrid({ candidate, fields }) {
+  const [locationDraft, setLocationDraft] = useState({
+    city: candidate.city || "",
+    state: candidate.state || "",
+    zip: candidate.zip || ""
+  });
+  const hasLocationFields = fields.some(([key]) => ["city", "state", "zip"].includes(key));
+  const otherFields = hasLocationFields ? fields.filter(([key]) => !["city", "state", "zip"].includes(key)) : fields;
+
+  return (
+    <div className="field-grid">
+      {hasLocationFields ? <LocationFields draft={locationDraft} setDraft={setLocationDraft} /> : null}
+      {otherFields.map((field) => <CallField key={field[0]} candidate={candidate} field={field} />)}
+    </div>
+  );
 }
 
 function CallField({ candidate, field }) {
@@ -1551,7 +1568,7 @@ function LocationFields({ draft, setDraft }) {
   return (
     <>
       <div className="location-field">
-        <label>City<input value={draft.city} onFocus={() => setCityOpen(true)} onChange={(event) => {
+        <label>City<input name="city" value={draft.city} onFocus={() => setCityOpen(true)} onChange={(event) => {
           setDraft((current) => ({ ...current, city: event.target.value }));
           setCityOpen(true);
         }} onBlur={() => setTimeout(() => setCityOpen(false), 140)} autoComplete="off" /></label>
@@ -1565,8 +1582,8 @@ function LocationFields({ draft, setDraft }) {
           </div>
         ) : null}
       </div>
-      <label>State<select value={draft.state} onChange={(event) => setDraft((current) => ({ ...current, state: event.target.value }))}><option value="">Выберите</option>{states.map((state) => <option key={state}>{state}</option>)}</select></label>
-      <label>ZIP<input inputMode="numeric" value={draft.zip} onChange={(event) => setDraft((current) => ({ ...current, zip: event.target.value.replace(/\D/g, "").slice(0, 5) }))} />{zipStatus ? <span className={`field-hint ${zipStatus.includes("not") ? "error" : ""}`}>{zipStatus}</span> : null}</label>
+      <label>State<select name="state" value={draft.state} onChange={(event) => setDraft((current) => ({ ...current, state: event.target.value }))}><option value="">Выберите</option>{states.map((state) => <option key={state}>{state}</option>)}</select></label>
+      <label>ZIP<input name="zip" inputMode="numeric" value={draft.zip} onChange={(event) => setDraft((current) => ({ ...current, zip: event.target.value.replace(/\D/g, "").slice(0, 5) }))} />{zipStatus ? <span className={`field-hint ${zipStatus.includes("not") ? "error" : ""}`}>{zipStatus}</span> : null}</label>
     </>
   );
 }
