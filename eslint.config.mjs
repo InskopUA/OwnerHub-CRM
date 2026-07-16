@@ -6,7 +6,7 @@ export default [
   },
   js.configs.recommended,
   {
-    files: ["app/**/*.jsx", "lib/**/*.js"],
+    files: ["app/**/*.js", "app/**/*.jsx", "lib/**/*.js"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
@@ -23,6 +23,7 @@ export default [
         process: "readonly",
         setTimeout: "readonly",
         structuredClone: "readonly",
+        URL: "readonly",
         window: "readonly"
       }
     },
