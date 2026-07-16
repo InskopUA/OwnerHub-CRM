@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sofia Recruiting Hub</title>
+  <style>
+    :root {
+      --yellow: #ffd400;
+      --yellow-2: #ffea70;
+      --yellow-soft: #fff8cf;
+      --ink: #171717;
+      --muted: #6f7277;
+      --line: #e8e8e8;
+      --surface: #ffffff;
+      --surface-2: #f7f7f5;
+      --green: #18a56f;
+      --red: #e5484d;
+      --orange: #f59f00;
+      --blue: #2775ff;
+      --purple: #7c4dff;
+      --shadow: 0 18px 45px rgba(23, 23, 23, .08);
+      --shadow-sm: 0 8px 24px rgba(23, 23, 23, .07);
+      --radius: 18px;
+      --sidebar: 248px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--surface-2); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { overflow-x: hidden; }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+    a { color: inherit; }
+    .hidden { display: none !important; }
+
+    .app-shell { min-height: 100vh; display: grid; grid-template-columns: var(--sidebar) 1fr; }
+    .sidebar {
+      position: sticky; top: 0; height: 100vh; padding: 22px 16px; background: var(--ink); color: white;
+      display: flex; flex-direction: column; z-index: 20;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; padding: 0 8px 22px; }
+    .brand-mark { width: 42px; height: 42px; border-radius: 13px; background: var(--yellow); color: var(--ink); display: grid; place-items: center; font-weight: 950; font-size: 21px; box-shadow: 0 0 0 5px rgba(255,212,0,.12); }
+    .brand-copy strong { display: block; font-size: 15px; line-height: 1.2; }
+    .brand-copy span { display: block; color: #a6a6a6; font-size: 11px; margin-top: 4px; letter-spacing: .08em; text-transform: uppercase; }
+    .nav { display: grid; gap: 6px; }
+    .nav-btn {
+      appearance: none; border: 0; background: transparent; color: #cfcfcf; padding: 12px 13px; border-radius: 12px;
+      text-align: left; display: flex; align-items: center; gap: 11px; transition: .18s ease;
+    }
+    .nav-btn:hover { background: rgba(255,255,255,.07); color: white; }
+    .nav-btn.active { background: var(--yellow); color: var(--ink); font-weight: 800; }
+    .nav-icon { width: 20px; height: 20px; display: grid; place-items: center; font-size: 17px; }
+    .sidebar-bottom { margin-top: auto; padding: 16px 8px 0; border-top: 1px solid rgba(255,255,255,.1); }
+    .local-chip { display: flex; gap: 9px; align-items: center; font-size: 12px; color: #c9c9c9; }
+    .local-dot { width: 9px; height: 9px; background: #38d996; border-radius: 50%; box-shadow: 0 0 0 4px rgba(56,217,150,.12); }
+
+    .main { min-width: 0; }
+    .topbar {
+      position: sticky; top: 0; z-index: 15; height: 76px; padding: 0 30px; background: rgba(247,247,245,.88); backdrop-filter: blur(14px);
+      display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,.04);
+    }
+    .page-title { font-size: 23px; font-weight: 900; letter-spacing: -.03em; }
+    .page-subtitle { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .content { padding: 28px 30px 46px; max-width: 1760px; margin: 0 auto; }
+
+    .btn { border: 1px solid var(--line); background: white; color: var(--ink); border-radius: 12px; padding: 10px 14px; display: inline-flex; gap: 8px; align-items: center; justify-content: center; font-weight: 750; transition: .18s ease; }
+    .btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+    .btn-primary { background: var(--yellow); border-color: var(--yellow); }
+    .btn-dark { background: var(--ink); border-color: var(--ink); color: white; }
+    .btn-soft { background: var(--yellow-soft); border-color: #f2dc69; }
+    .btn-danger { color: var(--red); background: #fff5f5; border-color: #ffd6d8; }
+    .btn-small { padding: 7px 10px; border-radius: 10px; font-size: 12px; }
+    .icon-btn { width: 40px; height: 40px; padding: 0; border-radius: 12px; }
+
+    .grid { display: grid; gap: 18px; }
+    .stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .two-col { grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr); }
+    .three-col { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+    .card-pad { padding: 20px; }
+    .stat-card { padding: 20px; position: relative; overflow: hidden; min-height: 132px; }
+    .stat-card:after { content: ""; position: absolute; right: -22px; bottom: -34px; width: 100px; height: 100px; border-radius: 50%; background: var(--yellow-soft); }
+    .stat-label { color: var(--muted); font-size: 12px; font-weight: 700; }
+    .stat-value { font-size: 34px; line-height: 1; font-weight: 950; letter-spacing: -.04em; margin-top: 16px; }
+    .stat-note { font-size: 11px; color: var(--muted); margin-top: 10px; }
+    .stat-accent { position: absolute; top: 18px; right: 18px; z-index: 1; width: 34px; height: 34px; border-radius: 11px; background: var(--yellow); display: grid; place-items: center; font-weight: 900; }
+
+    .section-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+    .section-title { font-size: 18px; font-weight: 900; letter-spacing: -.02em; }
+    .section-note { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+    .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+    .searchbox { position: relative; flex: 1 1 260px; }
+    .searchbox input { padding-left: 39px; }
+    .searchbox span { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); opacity: .55; }
+    .input, input, select, textarea { width: 100%; border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; background: white; color: var(--ink); outline: none; transition: .15s; }
+    input:focus, select:focus, textarea:focus { border-color: #dfbd00; box-shadow: 0 0 0 4px rgba(255,212,0,.16); }
+    textarea { min-height: 92px; resize: vertical; }
+    label { display: grid; gap: 7px; font-size: 12px; font-weight: 800; color: #4f5155; }
+    .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .field-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .field-span { grid-column: 1 / -1; }
+
+    .table-wrap { overflow: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 900px; }
+    th { padding: 13px 14px; font-size: 11px; text-align: left; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); background: #fbfbfa; border-bottom: 1px solid var(--line); position: sticky; top: 0; }
+    td { padding: 14px; border-bottom: 1px solid var(--line); font-size: 13px; vertical-align: middle; }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr { transition: .15s; }
+    tbody tr:hover { background: #fffdf2; }
+    .person { display: flex; align-items: center; gap: 11px; }
+    .avatar { width: 38px; height: 38px; border-radius: 12px; background: var(--yellow-soft); border: 1px solid #f3dc64; display: grid; place-items: center; font-weight: 900; color: #5c4b00; flex: 0 0 auto; }
+    .person strong { display: block; }
+    .person small { color: var(--muted); display: block; margin-top: 3px; }
+
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+    .badge-yellow { background: var(--yellow-soft); color: #6d5800; }
+    .badge-green { background: #e8f8f1; color: #087d51; }
+    .badge-red { background: #fff0f0; color: #b82e34; }
+    .badge-blue { background: #edf3ff; color: #175bc5; }
+    .badge-gray { background: #f0f1f2; color: #5f6268; }
+    .badge-orange { background: #fff4df; color: #ad6800; }
+    .badge-purple { background: #f0ebff; color: #5a32c9; }
+    .score { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; font-weight: 900; }
+    .score.green { background: #e8f8f1; color: var(--green); }
+    .score.yellow { background: var(--yellow-soft); color: #927400; }
+    .score.red { background: #fff0f0; color: var(--red); }
+
+    .empty { padding: 54px 24px; text-align: center; color: var(--muted); }
+    .empty-icon { width: 62px; height: 62px; border-radius: 20px; display: grid; place-items: center; background: var(--yellow-soft); margin: 0 auto 14px; font-size: 26px; }
+
+    .follow-list { display: grid; gap: 10px; }
+    .follow-item { border: 1px solid var(--line); border-radius: 14px; padding: 13px; display: flex; gap: 12px; align-items: center; background: white; }
+    .follow-time { width: 56px; flex: 0 0 56px; font-weight: 900; font-size: 13px; text-align: center; padding: 8px 4px; border-radius: 11px; background: var(--yellow-soft); }
+    .follow-main { min-width: 0; flex: 1; }
+    .follow-main strong { display: block; }
+    .follow-main span { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .follow-actions { display: flex; gap: 6px; }
+
+    .bar-row { display: grid; grid-template-columns: 116px 1fr 34px; gap: 10px; align-items: center; margin: 12px 0; font-size: 12px; }
+    .bar-track { height: 9px; background: #f0f0ed; border-radius: 999px; overflow: hidden; }
+    .bar-fill { height: 100%; background: var(--yellow); border-radius: 999px; }
+
+    .kanban { display: grid; grid-auto-flow: column; grid-auto-columns: 285px; gap: 14px; overflow-x: auto; padding-bottom: 12px; align-items: start; }
+    .kanban-col { background: #efefec; border-radius: 16px; padding: 12px; min-height: 560px; border: 1px solid #e4e4e0; }
+    .kanban-col.dragover { outline: 3px solid rgba(255,212,0,.5); background: #fff9d8; }
+    .kanban-head { display: flex; justify-content: space-between; align-items: center; margin: 2px 3px 11px; }
+    .kanban-head strong { font-size: 13px; }
+    .kanban-count { width: 26px; height: 26px; border-radius: 9px; display: grid; place-items: center; background: white; font-size: 11px; font-weight: 900; }
+    .kanban-cards { display: grid; gap: 9px; }
+    .kanban-card { background: white; border: 1px solid var(--line); border-radius: 14px; padding: 13px; box-shadow: 0 5px 16px rgba(0,0,0,.04); cursor: grab; }
+    .kanban-card:active { cursor: grabbing; }
+    .kanban-card .name { font-weight: 900; }
+    .kanban-card .meta { color: var(--muted); font-size: 11px; margin-top: 5px; }
+    .kanban-card .foot { display: flex; justify-content: space-between; margin-top: 12px; align-items: center; }
+
+    .candidate-head { background: var(--ink); color: white; border-radius: 22px; padding: 24px; position: relative; overflow: hidden; }
+    .candidate-head:after { content: ""; position: absolute; width: 260px; height: 260px; background: var(--yellow); border-radius: 50%; right: -125px; top: -125px; }
+    .candidate-head-inner { position: relative; z-index: 1; display: flex; align-items: center; gap: 18px; }
+    .candidate-big-avatar { width: 72px; height: 72px; border-radius: 22px; background: var(--yellow); color: var(--ink); display: grid; place-items: center; font-size: 25px; font-weight: 950; }
+    .candidate-title { font-size: 28px; font-weight: 950; letter-spacing: -.04em; }
+    .candidate-meta { color: #bdbdbd; margin-top: 6px; font-size: 13px; }
+    .candidate-head-actions { margin-left: auto; display: flex; gap: 9px; }
+    .candidate-head .btn { border-color: rgba(255,255,255,.2); }
+    .profile-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 18px; margin-top: 18px; }
+    .info-section { padding: 20px; }
+    .info-section + .info-section { border-top: 1px solid var(--line); }
+    .info-title { font-size: 14px; font-weight: 900; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+    .info-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .info-item { min-width: 0; }
+    .info-item span { color: var(--muted); font-size: 11px; display: block; }
+    .info-item strong { display: block; margin-top: 4px; font-size: 13px; word-break: break-word; }
+    .timeline { display: grid; gap: 0; }
+    .timeline-item { position: relative; padding: 0 0 18px 26px; }
+    .timeline-item:before { content: ""; position: absolute; left: 7px; top: 15px; bottom: -3px; width: 2px; background: #ecece8; }
+    .timeline-item:last-child:before { display: none; }
+    .timeline-dot { position: absolute; left: 0; top: 3px; width: 16px; height: 16px; background: white; border: 4px solid var(--yellow); border-radius: 50%; }
+    .timeline-item strong { font-size: 12px; }
+    .timeline-item p { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .timeline-item time { display: block; color: #a1a1a1; font-size: 10px; margin-top: 5px; }
+
+    .docs-grid { display: grid; gap: 9px; }
+    .doc-row { display: grid; grid-template-columns: 1fr 132px; gap: 12px; align-items: center; border: 1px solid var(--line); padding: 10px 12px; border-radius: 12px; }
+    .doc-row strong { font-size: 12px; }
+    .doc-row select { padding: 7px 8px; font-size: 11px; }
+
+    .progress { height: 8px; background: #eeeeeb; border-radius: 999px; overflow: hidden; }
+    .progress > div { height: 100%; background: var(--yellow); border-radius: 999px; transition: .3s; }
+
+    .call-layout { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 18px; align-items: start; }
+    .call-card { overflow: hidden; }
+    .call-top { padding: 18px 20px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+    .call-progress-label { color: var(--muted); font-size: 11px; margin-bottom: 8px; }
+    .call-body { padding: 28px; min-height: 520px; display: flex; flex-direction: column; }
+    .script-label { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; color: #7b6500; background: var(--yellow-soft); padding: 7px 10px; border-radius: 999px; align-self: flex-start; }
+    .script-text { font-size: 24px; line-height: 1.38; font-weight: 850; letter-spacing: -.03em; margin: 20px 0; max-width: 920px; }
+    .script-help { color: var(--muted); font-size: 13px; line-height: 1.6; padding: 13px 15px; border-left: 4px solid var(--yellow); background: #fffdf2; border-radius: 0 12px 12px 0; margin-bottom: 18px; }
+    .answer-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 7px; }
+    .answer-btn { min-height: 70px; text-align: left; justify-content: flex-start; background: white; border: 2px solid var(--line); padding: 14px 15px; border-radius: 14px; font-weight: 800; }
+    .answer-btn:hover, .answer-btn.selected { border-color: var(--yellow); background: var(--yellow-soft); box-shadow: none; transform: none; }
+    .call-fields { margin-top: 6px; }
+    .call-footer { margin-top: auto; padding-top: 22px; display: flex; justify-content: space-between; gap: 10px; }
+    .live-summary { position: sticky; top: 94px; }
+    .summary-list { display: grid; gap: 11px; }
+    .summary-row { padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+    .summary-row:last-child { border-bottom: 0; padding-bottom: 0; }
+    .summary-row span { display: block; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+    .summary-row strong { display: block; margin-top: 4px; font-size: 12px; }
+
+    .call-selector { padding: 18px; }
+    .candidate-choice-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .candidate-choice { border: 2px solid var(--line); border-radius: 14px; padding: 14px; background: white; text-align: left; }
+    .candidate-choice:hover { border-color: var(--yellow); background: #fffdf2; }
+
+    .modal-backdrop { position: fixed; inset: 0; z-index: 100; background: rgba(20,20,20,.48); backdrop-filter: blur(5px); display: grid; place-items: center; padding: 22px; }
+    .modal { width: min(760px, 100%); max-height: 92vh; overflow: auto; background: white; border-radius: 22px; box-shadow: 0 30px 100px rgba(0,0,0,.25); }
+    .modal.wide { width: min(980px, 100%); }
+    .modal-head { padding: 19px 22px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: white; z-index: 2; }
+    .modal-head strong { font-size: 18px; }
+    .modal-body { padding: 22px; }
+    .modal-foot { padding: 16px 22px; display: flex; justify-content: flex-end; gap: 9px; border-top: 1px solid var(--line); position: sticky; bottom: 0; background: white; }
+
+    .toast { position: fixed; right: 24px; bottom: 24px; z-index: 200; background: var(--ink); color: white; border-radius: 13px; padding: 13px 16px; box-shadow: var(--shadow); font-size: 12px; max-width: 330px; animation: toastIn .25s ease; }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } }
+
+    .hero { padding: 28px; background: linear-gradient(120deg, var(--yellow) 0%, #ffe969 100%); border-radius: 22px; position: relative; overflow: hidden; display: flex; justify-content: space-between; align-items: center; gap: 25px; margin-bottom: 18px; }
+    .hero:after { content: ""; width: 280px; height: 280px; position: absolute; right: -90px; top: -140px; border: 45px solid rgba(255,255,255,.35); border-radius: 50%; }
+    .hero h1 { margin: 0; font-size: 30px; line-height: 1.1; letter-spacing: -.045em; max-width: 700px; }
+    .hero p { margin: 12px 0 0; max-width: 700px; font-size: 13px; line-height: 1.55; }
+    .hero-actions { display: flex; gap: 9px; position: relative; z-index: 1; flex-wrap: wrap; }
+
+    .settings-row { display: grid; grid-template-columns: 210px 1fr; gap: 22px; padding: 20px 0; border-bottom: 1px solid var(--line); }
+    .settings-row:last-child { border-bottom: 0; }
+    .settings-copy strong { font-size: 13px; }
+    .settings-copy p { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+
+    .mobile-menu { display: none; }
+    .mobile-overlay { display: none; }
+
+    @media (max-width: 1100px) {
+      :root { --sidebar: 220px; }
+      .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .two-col, .profile-grid, .call-layout { grid-template-columns: 1fr; }
+      .live-summary { position: static; }
+      .candidate-choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 780px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .sidebar { position: fixed; left: -270px; width: 250px; transition: .2s; }
+      .sidebar.open { left: 0; }
+      .mobile-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 19; }
+      .mobile-overlay.show { display: block; }
+      .mobile-menu { display: inline-flex; }
+      .topbar { padding: 0 16px; }
+      .content { padding: 20px 14px 38px; }
+      .stats-grid, .three-col, .field-grid, .field-grid-3, .info-grid, .candidate-choice-grid { grid-template-columns: 1fr; }
+      .hero { align-items: flex-start; flex-direction: column; }
+      .answer-options { grid-template-columns: 1fr; }
+      .candidate-head-inner { align-items: flex-start; flex-wrap: wrap; }
+      .candidate-head-actions { margin-left: 0; width: 100%; }
+      .settings-row { grid-template-columns: 1fr; gap: 10px; }
+      .top-actions .desktop-only { display: none; }
+    }
+
+    @media print {
+      .sidebar, .topbar, .no-print, .btn, .candidate-head-actions { display: none !important; }
+      .app-shell { display: block; }
+      .content { padding: 0; }
+      body { background: white; }
+      .card, .candidate-head { box-shadow: none; break-inside: avoid; }
+      .profile-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark">S</div>
+        <div class="brand-copy"><strong>Sofia Recruiting Hub</strong><span>Owner-Operator CRM</span></div>
+      </div>
+      <nav class="nav" id="nav"></nav>
+      <div class="sidebar-bottom">
+        <div class="local-chip"><span class="local-dot"></span><span>Локальное хранение активно</span></div>
+      </div>
+    </aside>
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <main class="main">
+      <header class="topbar">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <button class="btn icon-btn mobile-menu" id="mobileMenuBtn">☰</button>
+          <div>
+            <div class="page-title" id="pageTitle">Dashboard</div>
+            <div class="page-subtitle" id="pageSubtitle">Sofia Logistics LLC · Recruiting operations</div>
+          </div>
+        </div>
+        <div class="top-actions">
+          <button class="btn desktop-only" data-action="quick-followup">＋ Follow-up</button>
+          <button class="btn btn-primary" data-action="new-candidate">＋ Новый кандидат</button>
+        </div>
+      </header>
+      <section class="content" id="content"></section>
+    </main>
+  </div>
+
+  <div id="modalRoot"></div>
+  <input type="file" id="importFile" accept="application/json" class="hidden" />
+
+  <script>
+  (() => {
+    'use strict';
+
+    const STORAGE_KEY = 'sofiaRecruitingHub_v1';
+    const VERSION = 1;
+
+    const statuses = [
+      ['new','New Lead'], ['contact_attempted','Contact Attempted'], ['initial_contact','Initial Contact'],
+      ['qualified','Qualified'], ['docs_requested','Documents Requested'], ['docs_received','Documents Received'],
+      ['quote_pending','Insurance Quote Pending'], ['insurance_approved','Insurance Approved'], ['insurance_rejected','Insurance Rejected'],
+      ['offer_presented','Offer Presented'], ['agreement_sent','Lease Agreement Sent'], ['agreement_signed','Agreement Signed'],
+      ['equipment_shipped','Equipment Shipped'], ['inspection_pending','Inspection Pending'], ['safety_onboarding','Safety Onboarding'],
+      ['dispatch_onboarding','Dispatch Onboarding'], ['ready_first_load','Ready for First Load'], ['first_load','First Load Booked'],
+      ['active','Active Driver'], ['lost','Not Interested / Lost']
+    ];
+
+    const pipelineStatuses = ['new','contact_attempted','initial_contact','qualified','docs_requested','docs_received','quote_pending','insurance_approved','agreement_sent','safety_onboarding','dispatch_onboarding','ready_first_load','active','lost'];
+    const statusMap = Object.fromEntries(statuses);
+    const docLabels = {
+      license: 'Driver License', truckRegistration: 'Truck Registration', trailerRegistration: 'Trailer Registration',
+      medicalCard: 'Medical Card', truckInspection: 'Truck Inspection', trailerInspection: 'Trailer Inspection',
+      w9: 'W-9', voidedCheck: 'Voided Check', leaseAgreement: 'Owner Lease Agreement'
+    };
+    const docStatuses = [
+      ['not_requested','Not Requested'], ['requested','Requested'], ['received','Received'], ['review','Under Review'],
+      ['approved','Approved'], ['rejected','Rejected'], ['expired','Expired']
+    ];
+    const states = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
+
+    const nowISO = () => new Date().toISOString();
+    const todayISO = () => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    };
+    const addDays = (n) => { const d = new Date(); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+    const uid = (p='id') => `${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
+    const esc = (v='') => String(v).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    const fmtDate = (v, withTime=false) => {
+      if (!v) return '—';
+      const d = new Date(v.length === 10 ? `${v}T12:00:00` : v);
+      if (Number.isNaN(d.getTime())) return v;
+      return d.toLocaleDateString('ru-RU', withTime ? {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'} : {day:'2-digit',month:'short',year:'numeric'});
+    };
+    const fullName = c => `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Без имени';
+    const initials = c => ((c.firstName?.[0] || '') + (c.lastName?.[0] || '')).toUpperCase() || '?';
+    const val = (v, fallback='—') => (v === undefined || v === null || v === '') ? fallback : v;
+
+    function blankCandidate() {
+      return {
+        id: uid('cand'), createdAt: nowISO(), updatedAt: nowISO(), firstName:'', lastName:'', phone:'', email:'', language:'Russian', source:'',
+        city:'', state:'', zip:'', workPreference:'', homeTime:'', startDate:'', daysPerWeek:'', restrictions:'', expectedGross:'',
+        cdl:'', licenseType:'', experienceYears:'', carHaulingYears:'', twoCarExperience:'', accidents:'', violations:'', medicalCard:'', previousInsuranceRejection:'',
+        truck:{make:'',model:'',year:'',vin:'',gvwr:'',fuel:'',condition:'',inspection:''},
+        trailer:{make:'',model:'',year:'',vin:'',length:'',gvwr:'',capacity:'2',type:'Open',condition:'',inspection:''},
+        docs:Object.fromEntries(Object.keys(docLabels).map(k => [k,'not_requested'])),
+        insurance:{status:'not_started', weeklyQuote:'', notes:''},
+        status:'new', score:50, owner:'HR Manager', notes:'', lastContact:'', nextFollowUp:'',
+        call:{stepId:'start', history:[], answers:{}, completed:false, language:'ru'},
+        tags:[], demo:false
+      };
+    }
+
+    function demoState() {
+      const c1 = blankCandidate(); Object.assign(c1,{firstName:'Alex',lastName:'Ivanov',phone:'+1 (214) 555-0184',email:'alex.demo@example.com',city:'Dallas',state:'TX',zip:'75201',workPreference:'Local',homeTime:'Daily',source:'Facebook',status:'quote_pending',experienceYears:'5',carHaulingYears:'2',cdl:'Yes',startDate:addDays(7),notes:'Хочет маршруты Dallas–Houston и Dallas–San Antonio.',demo:true});
+      Object.assign(c1.truck,{make:'Ford',model:'F-350',year:'2021',condition:'Good'}); Object.assign(c1.trailer,{make:'Kaufman',model:'EZ4',year:'2022',condition:'Good'}); c1.docs.license='approved'; c1.docs.truckRegistration='received'; c1.docs.trailerRegistration='received'; c1.score=86;
+      const c2 = blankCandidate(); Object.assign(c2,{firstName:'Michael',lastName:'Brown',phone:'+1 (312) 555-0139',email:'michael.demo@example.com',city:'Chicago',state:'IL',zip:'60601',workPreference:'Both',homeTime:'4x weekly',source:'Referral',status:'docs_requested',experienceYears:'3',carHaulingYears:'1',cdl:'No',startDate:addDays(14),demo:true,score:72}); Object.assign(c2.truck,{make:'RAM',model:'3500',year:'2020'}); Object.assign(c2.trailer,{make:'Take 3',model:'2-Car',year:'2021'});
+      const c3 = blankCandidate(); Object.assign(c3,{firstName:'Denis',lastName:'Petrov',phone:'+1 (407) 555-0108',city:'Orlando',state:'FL',zip:'32801',workPreference:'OTR',homeTime:'2–3 weeks out',source:'Telegram',status:'safety_onboarding',experienceYears:'7',carHaulingYears:'4',cdl:'Yes',demo:true,score:91}); Object.assign(c3.truck,{make:'Chevrolet',model:'Silverado 3500HD',year:'2022'}); Object.assign(c3.trailer,{make:'Kaufman',model:'Mini 5',year:'2023'}); Object.keys(c3.docs).forEach(k=>c3.docs[k]='approved');
+      const c4 = blankCandidate(); Object.assign(c4,{firstName:'John',lastName:'Williams',phone:'+1 (704) 555-0172',city:'Charlotte',state:'NC',workPreference:'Local',source:'Indeed',status:'new',demo:true,score:61});
+      const candidates=[c1,c2,c3,c4];
+      return {
+        version:VERSION,
+        settings:{companyName:'Sofia Logistics LLC', hubName:'Sofia Recruiting Hub', hrName:'HR Manager', defaultScriptLanguage:'ru'},
+        candidates,
+        followups:[
+          {id:uid('fu'),candidateId:c1.id,date:todayISO(),time:'10:30',type:'Call',note:'Уточнить статус insurance quote',status:'open',createdAt:nowISO()},
+          {id:uid('fu'),candidateId:c2.id,date:todayISO(),time:'14:00',type:'WhatsApp',note:'Напомнить отправить trailer registration',status:'open',createdAt:nowISO()},
+          {id:uid('fu'),candidateId:c3.id,date:addDays(1),time:'11:00',type:'Call',note:'Проверить настройку logbook',status:'open',createdAt:nowISO()}
+        ],
+        activities:[
+          {id:uid('act'),candidateId:c1.id,type:'status',text:'Статус изменён на Insurance Quote Pending',createdAt:nowISO()},
+          {id:uid('act'),candidateId:c2.id,type:'note',text:'Запрошены документы кандидата',createdAt:nowISO()},
+          {id:uid('act'),candidateId:c3.id,type:'status',text:'Передан в Safety Onboarding',createdAt:nowISO()}
+        ]
+      };
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) { console.warn('Storage unavailable', e); }
+      const initial = demoState();
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(initial)); } catch (e) {}
+      return initial;
+    }
+
+    let db = loadState();
+    let ui = {view:'dashboard', selectedCandidateId:null, filters:{search:'',state:'',status:'',work:''}, pipelineSearch:'', followFilter:'open', callCandidateId:null, modal:null};
+
+    function save() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }
+      catch (e) { toast('Не удалось сохранить локально. Сделайте экспорт базы.'); }
+    }
+    function touch(c) { c.updatedAt = nowISO(); }
+    function candidateById(id) { return db.candidates.find(c=>c.id===id); }
+    function addActivity(candidateId, text, type='note') { db.activities.unshift({id:uid('act'),candidateId,type,text,createdAt:nowISO()}); save(); }
+
+    function toast(message) {
+      document.querySelectorAll('.toast').forEach(x=>x.remove());
+      const el=document.createElement('div'); el.className='toast'; el.textContent=message; document.body.appendChild(el);
+      setTimeout(()=>el.remove(),3000);
+    }
+
+    const navItems = [
+      ['dashboard','⌂','Dashboard'], ['candidates','◎','Кандидаты'], ['calls','☎','Скрипт звонка'],
+      ['pipeline','▥','Воронка'], ['followups','✓','Follow-ups'], ['settings','⚙','Настройки']
+    ];
+
+    function renderNav() {
+      document.getElementById('nav').innerHTML = navItems.map(([id,icon,label]) => `<button class="nav-btn ${ui.view===id?'active':''}" data-nav="${id}"><span class="nav-icon">${icon}</span>${label}</button>`).join('');
+    }
+
+    function titleForView() {
+      if (ui.view==='candidate') return ['Карточка кандидата','Полный профиль, документы и путь онбординга'];
+      const map={dashboard:['Dashboard','Обзор рекрутинга Owner-Operators'],candidates:['Кандидаты','Единая база лидов и водителей'],calls:['Скрипт звонка','Интерактивный помощник HR'],pipeline:['Воронка онбординга','Перемещайте кандидатов между этапами'],followups:['Follow-ups','План контактов и напоминаний'],settings:['Настройки','Локальные данные и параметры системы']};
+      return map[ui.view]||['Sofia Recruiting Hub',''];
+    }
+
+    function render() {
+      renderNav();
+      const [t,s]=titleForView(); document.getElementById('pageTitle').textContent=t; document.getElementById('pageSubtitle').textContent=s;
+      const content=document.getElementById('content');
+      const views={dashboard:renderDashboard,candidates:renderCandidates,candidate:renderCandidate,calls:renderCalls,pipeline:renderPipeline,followups:renderFollowups,settings:renderSettings};
+      content.innerHTML=(views[ui.view]||renderDashboard)();
+      wireViewEvents();
+    }
+
+    function badgeStatus(status) {
+      const cls = status==='active'||status==='insurance_approved'||status==='ready_first_load' ? 'badge-green' : status==='lost'||status==='insurance_rejected' ? 'badge-red' : status==='quote_pending'||status==='docs_requested' ? 'badge-orange' : status==='qualified'||status==='docs_received' ? 'badge-blue' : status==='safety_onboarding'||status==='dispatch_onboarding' ? 'badge-purple' : 'badge-gray';
+      return `<span class="badge ${cls}">${esc(statusMap[status]||status)}</span>`;
+    }
+    function scoreClass(score) { return score>=80?'green':score>=55?'yellow':'red'; }
+    function calculateScore(c) {
+      let score=35;
+      if(c.city&&c.state) score+=7;
+      if(c.workPreference) score+=5;
+      if(c.truck.make&&c.trailer.make) score+=12;
+      if(c.cdl) score+=4;
+      if(Number(c.experienceYears)>=2) score+=7;
+      if(Number(c.carHaulingYears)>=1) score+=8;
+      if(c.accidents==='0'||c.accidents==='None') score+=7;
+      if(c.violations==='0'||c.violations==='None') score+=6;
+      if(c.startDate) score+=4;
+      const received=Object.values(c.docs||{}).filter(x=>['received','review','approved'].includes(x)).length;
+      score+=Math.min(5,received);
+      if(c.previousInsuranceRejection==='Yes') score-=15;
+      if(c.truck.condition==='Poor'||c.trailer.condition==='Poor') score-=12;
+      return Math.max(0,Math.min(100,score));
+    }
+
+    function renderDashboard() {
+      const total=db.candidates.length, active=db.candidates.filter(c=>c.status==='active').length, qualified=db.candidates.filter(c=>['qualified','docs_requested','docs_received','quote_pending','insurance_approved','agreement_sent','agreement_signed','equipment_shipped','inspection_pending','safety_onboarding','dispatch_onboarding','ready_first_load','first_load','active'].includes(c.status)).length;
+      const today=db.followups.filter(f=>f.status==='open'&&f.date===todayISO()).length;
+      const openFollow=db.followups.filter(f=>f.status==='open').sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)).slice(0,6);
+      const stateCounts={}; db.candidates.forEach(c=>{if(c.state) stateCounts[c.state]=(stateCounts[c.state]||0)+1});
+      const topStates=Object.entries(stateCounts).sort((a,b)=>b[1]-a[1]).slice(0,7); const maxState=Math.max(1,...topStates.map(x=>x[1]));
+      const recent=[...db.candidates].sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)).slice(0,6);
+      return `
+        <div class="hero">
+          <div><h1>Вся рекрутинговая работа — в одном понятном процессе.</h1><p>Ведите звонок по скрипту, собирайте данные Owner-Operator, контролируйте документы, страхование, safety и передачу диспетчеру.</p></div>
+          <div class="hero-actions"><button class="btn btn-dark" data-action="start-call">☎ Начать звонок</button><button class="btn" data-action="new-candidate">＋ Добавить кандидата</button></div>
+        </div>
+        ${db.candidates.some(c=>c.demo)?`<div class="card card-pad" style="margin-bottom:18px;background:#fffdf2;border-color:#f0dc71;display:flex;align-items:center;justify-content:space-between;gap:15px;"><div><strong>В системе загружены демонстрационные кандидаты</strong><div class="section-note">Можно изучить интерфейс, а затем удалить примеры в настройках.</div></div><button class="btn btn-small" data-nav="settings">Открыть настройки</button></div>`:''}
+        <div class="grid stats-grid">
+          ${statCard('Всего кандидатов',total,'◎','Полная база лидов')}
+          ${statCard('В работе',qualified,'↗','Квалифицированы и проходят этапы')}
+          ${statCard('Follow-ups сегодня',today,'✓','Требуют контакта сегодня')}
+          ${statCard('Активные водители',active,'★','Успешно начали работу')}
+        </div>
+        <div class="grid two-col" style="margin-top:18px;">
+          <div class="card card-pad">
+            <div class="section-header"><div><div class="section-title">Последние кандидаты</div><div class="section-note">Недавно добавленные и обновлённые лиды</div></div><button class="btn btn-small" data-nav="candidates">Все кандидаты</button></div>
+            ${recent.length?`<div class="table-wrap"><table style="min-width:700px"><thead><tr><th>Кандидат</th><th>Локация</th><th>Формат</th><th>Статус</th><th>Score</th></tr></thead><tbody>${recent.map(c=>`<tr data-open-candidate="${c.id}" style="cursor:pointer"><td><div class="person"><div class="avatar">${initials(c)}</div><div><strong>${esc(fullName(c))}</strong><small>${esc(c.phone||c.email||'Нет контакта')}</small></div></div></td><td>${esc([c.city,c.state].filter(Boolean).join(', ')||'—')}</td><td>${esc(c.workPreference||'—')}</td><td>${badgeStatus(c.status)}</td><td><div class="score ${scoreClass(c.score)}">${c.score}</div></td></tr>`).join('')}</tbody></table></div>`:emptyState('Кандидатов пока нет','Добавьте первый лид, чтобы начать работу.')}
+          </div>
+          <div class="card card-pad">
+            <div class="section-header"><div><div class="section-title">Follow-ups</div><div class="section-note">Ближайшие задачи HR</div></div><button class="btn btn-small" data-action="quick-followup">＋</button></div>
+            ${openFollow.length?`<div class="follow-list">${openFollow.map(f=>followItem(f,true)).join('')}</div>`:emptyState('Нет открытых follow-ups','Все контакты обработаны.')}
+          </div>
+        </div>
+        <div class="grid two-col" style="margin-top:18px;">
+          <div class="card card-pad"><div class="section-title">Кандидаты по штатам</div><div class="section-note">География текущей базы</div><div style="margin-top:16px">${topStates.length?topStates.map(([st,n])=>`<div class="bar-row"><strong>${st}</strong><div class="bar-track"><div class="bar-fill" style="width:${n/maxState*100}%"></div></div><b>${n}</b></div>`).join(''):'<div class="empty">Нет данных по штатам</div>'}</div></div>
+          <div class="card card-pad"><div class="section-title">Распределение по формату</div><div class="section-note">Local, OTR и универсальные кандидаты</div><div style="margin-top:16px">${workBars()}</div></div>
+        </div>`;
+    }
+
+    function statCard(label,value,icon,note){return `<div class="card stat-card"><div class="stat-accent">${icon}</div><div class="stat-label">${label}</div><div class="stat-value">${value}</div><div class="stat-note">${note}</div></div>`}
+    function workBars(){const vals=['Local','OTR','Both']; const counts=vals.map(v=>[v,db.candidates.filter(c=>c.workPreference===v).length]);const max=Math.max(1,...counts.map(x=>x[1]));return counts.map(([v,n])=>`<div class="bar-row"><strong>${v}</strong><div class="bar-track"><div class="bar-fill" style="width:${n/max*100}%"></div></div><b>${n}</b></div>`).join('')}
+    function emptyState(title,note){return `<div class="empty"><div class="empty-icon">◎</div><strong>${title}</strong><div style="margin-top:7px;font-size:12px">${note}</div></div>`}
+
+    function filteredCandidates() {
+      const q=ui.filters.search.toLowerCase().trim();
+      return db.candidates.filter(c => {
+        const hay=[fullName(c),c.phone,c.email,c.city,c.state,c.zip,c.truck.make,c.truck.model,c.trailer.make,c.trailer.model].join(' ').toLowerCase();
+        return (!q||hay.includes(q))&&(!ui.filters.state||c.state===ui.filters.state)&&(!ui.filters.status||c.status===ui.filters.status)&&(!ui.filters.work||c.workPreference===ui.filters.work);
+      }).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+    }
+
+    function renderCandidates() {
+      const list=filteredCandidates();
+      return `<div class="card card-pad">
+        <div class="section-header"><div><div class="section-title">База кандидатов</div><div class="section-note">Найдено: ${list.length} из ${db.candidates.length}</div></div><div style="display:flex;gap:8px"><button class="btn btn-small" data-action="export-csv">⇩ CSV</button><button class="btn btn-primary btn-small" data-action="new-candidate">＋ Добавить</button></div></div>
+        <div class="toolbar">
+          <div class="searchbox"><span>⌕</span><input id="candidateSearch" placeholder="Имя, телефон, город, техника..." value="${esc(ui.filters.search)}"></div>
+          <select id="filterState" style="width:140px"><option value="">Все штаты</option>${states.map(s=>`<option ${ui.filters.state===s?'selected':''}>${s}</option>`).join('')}</select>
+          <select id="filterWork" style="width:150px"><option value="">Local / OTR</option>${['Local','OTR','Both','Not sure'].map(x=>`<option ${ui.filters.work===x?'selected':''}>${x}</option>`).join('')}</select>
+          <select id="filterStatus" style="width:210px"><option value="">Все статусы</option>${statuses.map(([v,l])=>`<option value="${v}" ${ui.filters.status===v?'selected':''}>${l}</option>`).join('')}</select>
+          <button class="btn btn-small" data-action="clear-filters">Сбросить</button>
+        </div>
+        ${list.length?`<div class="table-wrap"><table><thead><tr><th>Кандидат</th><th>Локация</th><th>Работа</th><th>Техника</th><th>Статус</th><th>Следующий контакт</th><th>Score</th><th></th></tr></thead><tbody>${list.map(c=>candidateRow(c)).join('')}</tbody></table></div>`:emptyState('Ничего не найдено','Измените фильтры или добавьте нового кандидата.')}
+      </div>`;
+    }
+
+    function candidateRow(c){
+      const fu=db.followups.filter(f=>f.candidateId===c.id&&f.status==='open').sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time))[0];
+      const equip=[c.truck.make,c.truck.model].filter(Boolean).join(' ')||'—';
+      return `<tr><td data-open-candidate="${c.id}" style="cursor:pointer"><div class="person"><div class="avatar">${initials(c)}</div><div><strong>${esc(fullName(c))}${c.demo?' <span class="badge badge-yellow" style="padding:3px 6px">DEMO</span>':''}</strong><small>${esc(c.phone||c.email||'Нет контакта')}</small></div></div></td><td>${esc([c.city,c.state].filter(Boolean).join(', ')||'—')}<br><small style="color:var(--muted)">${esc(c.zip||'')}</small></td><td>${esc(c.workPreference||'—')}<br><small style="color:var(--muted)">${esc(c.homeTime||'')}</small></td><td>${esc(equip)}<br><small style="color:var(--muted)">${esc([c.trailer.make,c.trailer.model].filter(Boolean).join(' ')||'')}</small></td><td>${badgeStatus(c.status)}</td><td>${fu?`${fmtDate(fu.date)} · ${esc(fu.time||'')}`:'—'}</td><td><div class="score ${scoreClass(c.score)}">${c.score}</div></td><td><button class="btn icon-btn btn-small" data-open-candidate="${c.id}">→</button></td></tr>`;
+    }
+
+    function renderCandidate() {
+      const c=candidateById(ui.selectedCandidateId); if(!c){ui.view='candidates';return renderCandidates();}
+      c.score=calculateScore(c); save();
+      const acts=db.activities.filter(a=>a.candidateId===c.id).slice(0,12);
+      const progressIndex=Math.max(0,pipelineStatuses.indexOf(c.status)); const progress=Math.round(progressIndex/(pipelineStatuses.length-2)*100);
+      return `<div class="candidate-head">
+        <div class="candidate-head-inner"><div class="candidate-big-avatar">${initials(c)}</div><div><div class="candidate-title">${esc(fullName(c))}</div><div class="candidate-meta">${esc([c.city,c.state,c.zip].filter(Boolean).join(', ')||'Локация не указана')} · ${esc(c.workPreference||'Формат не выбран')} · Lead Score ${c.score}</div></div>
+        <div class="candidate-head-actions no-print"><button class="btn" data-action="start-call-candidate" data-id="${c.id}">☎ Скрипт звонка</button><button class="btn" data-action="edit-candidate" data-id="${c.id}">✎ Редактировать</button><button class="btn btn-danger" data-action="delete-candidate" data-id="${c.id}">Удалить</button><button class="btn btn-primary" data-action="print-candidate">⎙ PDF / Print</button></div></div>
+      </div>
+      <div class="profile-grid">
+        <div class="card">
+          <div class="info-section"><div class="info-title">Контакт и предпочтения ${badgeStatus(c.status)}</div><div class="info-grid">
+            ${info('Телефон',c.phone)}${info('Email',c.email)}${info('Язык',c.language)}${info('Источник',c.source)}${info('Формат работы',c.workPreference)}${info('Home time',c.homeTime)}${info('Готов начать',fmtDate(c.startDate))}${info('Дней в неделю',c.daysPerWeek)}${info('Ожидаемый gross',c.expectedGross)}
+          </div></div>
+          <div class="info-section"><div class="info-title">Водитель</div><div class="info-grid">${info('CDL',c.cdl)}${info('License type',c.licenseType)}${info('Общий опыт',c.experienceYears?c.experienceYears+' years':'')}${info('Car hauling',c.carHaulingYears?c.carHaulingYears+' years':'')}${info('Two-car experience',c.twoCarExperience)}${info('Medical Card',c.medicalCard)}${info('Аварии',c.accidents)}${info('Нарушения',c.violations)}${info('Отказ страховой ранее',c.previousInsuranceRejection)}</div></div>
+          <div class="info-section"><div class="info-title">Truck</div><div class="info-grid">${info('Марка / модель',[c.truck.make,c.truck.model].filter(Boolean).join(' '))}${info('Год',c.truck.year)}${info('VIN',c.truck.vin)}${info('GVWR',c.truck.gvwr)}${info('Топливо',c.truck.fuel)}${info('Состояние',c.truck.condition)}${info('Инспекция',c.truck.inspection)}</div></div>
+          <div class="info-section"><div class="info-title">Trailer</div><div class="info-grid">${info('Марка / модель',[c.trailer.make,c.trailer.model].filter(Boolean).join(' '))}${info('Год',c.trailer.year)}${info('VIN',c.trailer.vin)}${info('Длина',c.trailer.length)}${info('GVWR',c.trailer.gvwr)}${info('Тип',c.trailer.type)}${info('Вместимость',c.trailer.capacity+' cars')}${info('Состояние',c.trailer.condition)}${info('Инспекция',c.trailer.inspection)}</div></div>
+          <div class="info-section"><div class="info-title">Комментарии <button class="btn btn-small no-print" data-action="edit-notes" data-id="${c.id}">Изменить</button></div><div style="font-size:13px;line-height:1.65;white-space:pre-wrap">${esc(c.notes||'Комментариев пока нет.')}</div>${c.restrictions?`<div class="script-help" style="margin-top:15px"><b>Ограничения:</b> ${esc(c.restrictions)}</div>`:''}</div>
+        </div>
+        <div class="grid" style="align-content:start">
+          <div class="card card-pad"><div class="info-title">Прогресс онбординга</div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:8px"><span>${esc(statusMap[c.status])}</span><strong>${Math.min(100,progress)}%</strong></div><div class="progress"><div style="width:${Math.min(100,progress)}%"></div></div><label style="margin-top:15px">Изменить этап<select id="profileStatus" data-id="${c.id}">${statuses.map(([v,l])=>`<option value="${v}" ${c.status===v?'selected':''}>${l}</option>`).join('')}</select></label><button class="btn btn-primary" style="margin-top:12px;width:100%" data-action="quick-followup" data-candidate="${c.id}">＋ Добавить follow-up</button></div>
+          <div class="card card-pad"><div class="info-title">Документы</div><div class="docs-grid">${Object.entries(docLabels).map(([k,l])=>`<div class="doc-row"><strong>${l}</strong><select data-doc="${k}" data-id="${c.id}">${docStatuses.map(([v,n])=>`<option value="${v}" ${c.docs[k]===v?'selected':''}>${n}</option>`).join('')}</select></div>`).join('')}</div></div>
+          <div class="card card-pad"><div class="info-title">Insurance</div><label>Status<select id="insuranceStatus" data-id="${c.id}">${[['not_started','Not Started'],['pending','Pending'],['approved','Approved'],['rejected','Rejected']].map(([v,l])=>`<option value="${v}" ${c.insurance.status===v?'selected':''}>${l}</option>`).join('')}</select></label><label style="margin-top:12px">Weekly quote<input id="insuranceQuote" data-id="${c.id}" placeholder="$300–$400" value="${esc(c.insurance.weeklyQuote)}"></label></div>
+          <div class="card card-pad"><div class="info-title">История активности</div>${acts.length?`<div class="timeline">${acts.map(a=>`<div class="timeline-item"><span class="timeline-dot"></span><strong>${esc(a.text)}</strong><time>${fmtDate(a.createdAt,true)}</time></div>`).join('')}</div>`:'<div class="section-note">История пока пуста.</div>'}</div>
+        </div>
+      </div>`;
+    }
+    function info(label,value){return `<div class="info-item"><span>${label}</span><strong>${esc(val(value))}</strong></div>`}
+
+    const callSteps = {
+      start:{
+        say:{ru:'Здравствуйте! Меня зовут [HR NAME], я представляю [COMPANY]. Мы подключаем Owner-Operators с открытыми трейлерами на две машины. Вам сейчас удобно разговаривать?',en:'Hello! My name is [HR NAME], and I represent [COMPANY]. We work with Owner-Operators using open two-car trailers. Is now a good time to talk?'},
+        help:'Выберите реальный ответ кандидата — система откроет нужную ветку разговора.',
+        type:'options', key:'availability', options:[
+          {v:'yes',ru:'Да, удобно',en:'Yes, now is good',next:'location'},
+          {v:'later',ru:'Сейчас неудобно',en:'Not a good time',next:'schedule_later'},
+          {v:'message',ru:'Сначала отправьте информацию',en:'Send information first',next:'send_info'},
+          {v:'not_interested',ru:'Неинтересно',en:'Not interested',next:'lost_reason'}]
+      },
+      schedule_later:{say:{ru:'Конечно. В какое время вам будет удобно, чтобы я перезвонила?',en:'Of course. What time would be convenient for me to call you back?'},type:'fields',fields:[['followDate','date','Дата'],['followTime','time','Время'],['followNote','text','Комментарий']],next:'finish_followup'},
+      send_info:{say:{ru:'Хорошо, я отправлю краткую информацию об условиях. Какой способ связи вам удобнее?',en:'Sure, I will send you a short overview of the terms. Which contact method works best for you?'},type:'options',key:'preferredContact',options:[{v:'WhatsApp',ru:'WhatsApp',en:'WhatsApp',next:'collect_contact'},{v:'SMS',ru:'SMS',en:'SMS',next:'collect_contact'},{v:'Email',ru:'Email',en:'Email',next:'collect_contact'}]},
+      collect_contact:{say:{ru:'Подскажите, пожалуйста, актуальный номер телефона или email.',en:'Please provide the best phone number or email address.'},type:'fields',fields:[['phone','tel','Телефон'],['email','email','Email']],next:'finish_message'},
+      lost_reason:{say:{ru:'Понимаю. Чтобы мы больше не беспокоили вас без необходимости, подскажите основную причину?',en:'Understood. To avoid unnecessary follow-ups, may I ask the main reason?'},type:'options',key:'lostReason',options:[{v:'Already contracted',ru:'Уже работает с другой компанией',en:'Already working with another company',next:'finish_lost'},{v:'Terms',ru:'Не подходят условия',en:'Terms do not work',next:'finish_lost'},{v:'No equipment',ru:'Нет подходящей техники',en:'No suitable equipment',next:'finish_lost'},{v:'Other',ru:'Другая причина',en:'Other reason',next:'finish_lost'}]},
+      location:{say:{ru:'Отлично. Подскажите, пожалуйста, в каком городе и штате вы сейчас находитесь?',en:'Great. What city and state are you currently based in?'},help:'Локация определяет доступность Local-маршрутов и ориентир по gross.',type:'fields',fields:[['city','text','City'],['state','state','State'],['zip','text','ZIP Code']],next:'work_type'},
+      work_type:{say:{ru:'Вы рассматриваете локальную работу с регулярным возвращением домой или OTR?',en:'Are you looking for local work with regular home time, or OTR?'},type:'options',key:'workPreference',options:[{v:'Local',ru:'Local',en:'Local',next:'local_pitch'},{v:'OTR',ru:'OTR',en:'OTR',next:'otr_pitch'},{v:'Both',ru:'Оба варианта',en:'Both options',next:'both_pitch'},{v:'Not sure',ru:'Пока не определился',en:'Not sure yet',next:'difference_pitch'}]},
+      local_pitch:{say:{ru:'На локальной работе мы обычно строим round trips в радиусе 200–300 миль. В подходящих локациях водитель возвращается домой практически каждый день или минимум четыре раза в неделю. Ориентировочный gross — $5,000–$7,000, rate per mile — около $2–$3.',en:'For local work, we usually build round trips within a 200–300 mile radius. In suitable markets, the driver can return home nearly every day or at least four times per week. Typical gross is $5,000–$7,000, with rates around $2–$3 per mile.'},type:'options',key:'localReaction',options:[{v:'Interested',ru:'Подходит / интересно',en:'Interested',next:'home_time'},{v:'Need OTR',ru:'Хочет больше gross — обсудить OTR',en:'Wants higher gross — discuss OTR',next:'otr_pitch'},{v:'Questions',ru:'Есть вопросы',en:'Has questions',next:'custom_question'}]},
+      otr_pitch:{say:{ru:'На OTR ориентировочный gross составляет $6,000–$8,000 в неделю. Средний rate per mile — около $1.80. Ставка ниже локальной, но водитель проезжает больше миль и может сделать больший общий gross.',en:'For OTR, typical gross is $6,000–$8,000 per week. Average rate per mile is around $1.80. The rate is lower than local, but the driver runs more miles and can produce a higher overall gross.'},type:'options',key:'otrReaction',options:[{v:'Interested',ru:'Подходит / интересно',en:'Interested',next:'home_time'},{v:'Need Local',ru:'Хочет чаще дома — обсудить Local',en:'Wants more home time — discuss Local',next:'local_pitch'},{v:'Questions',ru:'Есть вопросы',en:'Has questions',next:'custom_question'}]},
+      both_pitch:{say:{ru:'Мы можем проверить оба варианта под вашу локацию. Local обычно даёт более высокий rate per mile и больше home time, а OTR позволяет сделать больше gross за счёт большего пробега.',en:'We can evaluate both options for your location. Local usually offers a higher rate per mile and more home time, while OTR can produce more gross through higher mileage.'},type:'options',key:'preferredAfterPitch',options:[{v:'Local',ru:'Больше интересует Local',en:'More interested in Local',next:'home_time'},{v:'OTR',ru:'Больше интересует OTR',en:'More interested in OTR',next:'home_time'},{v:'Both',ru:'Рассматривать оба',en:'Consider both',next:'home_time'}]},
+      difference_pitch:{say:{ru:'Коротко объясню разницу: Local — меньше миль, выше rate и больше времени дома. OTR — больше миль, ниже rate, но потенциально выше общий gross. Какой вариант вам ближе?',en:'Here is the difference: Local means fewer miles, a higher rate, and more home time. OTR means more miles, a lower rate, but potentially higher total gross. Which option fits you better?'},type:'options',key:'workPreference',options:[{v:'Local',ru:'Local',en:'Local',next:'home_time'},{v:'OTR',ru:'OTR',en:'OTR',next:'home_time'},{v:'Both',ru:'Оба',en:'Both',next:'home_time'}]},
+      custom_question:{say:{ru:'Запишите вопрос кандидата и ответьте своими словами. После этого продолжите квалификацию.',en:'Record the candidate’s question and answer it in your own words. Then continue qualification.'},type:'fields',fields:[['candidateQuestion','textarea','Вопрос / комментарий']],next:'home_time'},
+      home_time:{say:{ru:'Насколько часто для вас важно возвращаться домой?',en:'How often do you need to return home?'},type:'options',key:'homeTime',options:[{v:'Daily',ru:'Каждый день',en:'Daily',next:'equipment_check'},{v:'4x weekly',ru:'Минимум 4 раза в неделю',en:'At least 4 times weekly',next:'equipment_check'},{v:'Weekly',ru:'Раз в неделю',en:'Weekly',next:'equipment_check'},{v:'2–3 weeks out',ru:'Готов быть 2–3 недели в дороге',en:'Can stay out 2–3 weeks',next:'equipment_check'},{v:'Flexible',ru:'Не принципиально',en:'Flexible',next:'equipment_check'}]},
+      equipment_check:{say:{ru:'У вас уже есть собственный truck и открытый trailer на две машины?',en:'Do you already own a truck and an open two-car trailer?'},type:'options',key:'hasEquipment',options:[{v:'Yes',ru:'Да, truck и trailer есть',en:'Yes, I have both',next:'truck_details'},{v:'Truck only',ru:'Есть только truck',en:'Truck only',next:'equipment_gap'},{v:'Trailer only',ru:'Есть только trailer',en:'Trailer only',next:'equipment_gap'},{v:'No',ru:'Нет своей техники',en:'No equipment',next:'equipment_gap'}]},
+      equipment_gap:{say:{ru:'Для подключения как Owner-Operator требуется собственный truck и подходящий открытый trailer на две машины. Запишем вашу ситуацию и можем сделать follow-up, когда техника будет готова.',en:'To onboard as an Owner-Operator, you need your own truck and a suitable open two-car trailer. We can record your situation and follow up when the equipment is ready.'},type:'fields',fields:[['equipmentPlan','textarea','План / когда будет техника'],['followDate','date','Follow-up date']],next:'finish_nurture'},
+      truck_details:{say:{ru:'Расскажите, пожалуйста, о вашем truck: марка, модель, год и техническое состояние.',en:'Please tell me about your truck: make, model, year, and condition.'},type:'fields',fields:[['truck.make','text','Make'],['truck.model','text','Model'],['truck.year','number','Year'],['truck.gvwr','text','GVWR'],['truck.condition','select:Good|Fair|Poor','Condition']],next:'trailer_details'},
+      trailer_details:{say:{ru:'Теперь уточним trailer: марка, модель, год, длина и GVWR.',en:'Now let’s confirm the trailer: make, model, year, length, and GVWR.'},type:'fields',fields:[['trailer.make','text','Make'],['trailer.model','text','Model'],['trailer.year','number','Year'],['trailer.length','text','Length'],['trailer.gvwr','text','GVWR'],['trailer.condition','select:Good|Fair|Poor','Condition']],next:'experience'},
+      experience:{say:{ru:'Какой у вас общий опыт вождения и сколько времени вы работаете в car hauling?',en:'How many years of driving experience do you have, and how long have you worked in car hauling?'},type:'fields',fields:[['experienceYears','number','Общий опыт, лет'],['carHaulingYears','number','Car hauling, лет'],['twoCarExperience','select:Yes|No|Some','Опыт two-car trailer'],['cdl','select:Yes|No','CDL']],next:'safety_record'},
+      safety_record:{say:{ru:'Были ли у вас аварии, серьёзные нарушения или отказ страховой компании за последние годы?',en:'Have you had any accidents, serious violations, or prior insurance rejection in recent years?'},help:'Не обещайте одобрение. Финальное решение и стоимость даёт страховая компания после проверки.',type:'fields',fields:[['accidents','text','Аварии'],['violations','text','Нарушения'],['previousInsuranceRejection','select:No|Yes','Отказ страховой ранее'],['medicalCard','select:Yes|No|Not required','Medical Card']],next:'start_readiness'},
+      start_readiness:{say:{ru:'Когда вы готовы начать работу и сколько дней в неделю планируете работать?',en:'When are you ready to start, and how many days per week do you plan to work?'},type:'fields',fields:[['startDate','date','Дата старта'],['daysPerWeek','number','Дней в неделю'],['restrictions','textarea','Ограничения по штатам / маршрутам']],next:'terms'},
+      terms:{say:{ru:'Наши условия: компания удерживает 10% от gross за dispatch. Выплаты каждую пятницу с задержкой в одну рабочую неделю. Страховка обычно $300–$400 в неделю, но точная цена зависит от driving record и quote страховой. При необходимости предоставляем fuel card.',en:'Our terms: the company charges 10% of gross for dispatch. Payments are made every Friday with a one-week hold. Insurance is typically $300–$400 per week, but the exact amount depends on the driving record and insurance quote. Fuel cards are available if needed.'},type:'options',key:'termsReaction',options:[{v:'Accepted',ru:'Условия подходят',en:'Terms work for me',next:'documents'},{v:'Need details',ru:'Нужны дополнительные разъяснения',en:'Needs more details',next:'terms_question'},{v:'Declined',ru:'Условия не подходят',en:'Terms do not work',next:'finish_lost'}]},
+      terms_question:{say:{ru:'Запишите, что именно кандидат хочет уточнить, и объясните условия без обещания фиксированного gross или точной страховки.',en:'Record what the candidate wants clarified and explain the terms without promising a fixed gross or exact insurance cost.'},type:'fields',fields:[['termsQuestion','textarea','Вопрос и результат обсуждения']],next:'documents'},
+      documents:{say:{ru:'Для начала insurance quote нам понадобятся Driver License, truck registration и trailer registration. Вы сможете отправить эти документы сегодня?',en:'To request an insurance quote, we need your Driver License, truck registration, and trailer registration. Can you send these documents today?'},type:'options',key:'documentsReady',options:[{v:'Today',ru:'Да, отправит сегодня',en:'Yes, today',next:'final_interest'},{v:'Later',ru:'Отправит позже',en:'Will send later',next:'doc_followup'},{v:'Missing',ru:'Некоторых документов нет',en:'Some documents are missing',next:'doc_followup'}]},
+      doc_followup:{say:{ru:'Когда лучше напомнить вам о документах?',en:'When should I remind you about the documents?'},type:'fields',fields:[['followDate','date','Дата follow-up'],['followTime','time','Время'],['followNote','text','Какие документы ожидаем']],next:'final_interest'},
+      final_interest:{say:{ru:'Отлично. После получения документов мы запросим insurance quote. Если страховая одобрит и стоимость подойдёт, отправим Owner Lease Agreement, logbook и signs, подключим safety и dispatch. Полный процесс обычно занимает 5–7 дней. Готовы начать онбординг?',en:'Great. After receiving the documents, we will request an insurance quote. If approved and the cost works for you, we will send the Owner Lease Agreement, logbook, and signs, then connect you with safety and dispatch. The full process usually takes 5–7 days. Are you ready to begin onboarding?'},type:'options',key:'finalInterest',options:[{v:'Ready',ru:'Да, готов',en:'Yes, ready',next:'finish_qualified'},{v:'Thinking',ru:'Нужно подумать',en:'Needs time to think',next:'thinking_followup'},{v:'No',ru:'Нет',en:'No',next:'finish_lost'}]},
+      thinking_followup:{say:{ru:'Хорошо. Когда лучше связаться с вами повторно?',en:'Understood. When should we follow up with you?'},type:'fields',fields:[['followDate','date','Дата'],['followTime','time','Время'],['followNote','text','Что нужно уточнить']],next:'finish_thinking'},
+      finish_followup:{finish:true,outcome:'followup',say:{ru:'Звонок завершён. Follow-up сохранён, кандидат останется на этапе Contact Attempted.',en:'Call completed. The follow-up is saved and the candidate remains at Contact Attempted.'}},
+      finish_message:{finish:true,outcome:'message',say:{ru:'Контакт сохранён. Отправьте информацию и поставьте follow-up после сообщения.',en:'Contact saved. Send the information and schedule a follow-up.'}},
+      finish_lost:{finish:true,outcome:'lost',say:{ru:'Кандидат отмечен как Not Interested / Lost. Причина сохранена в карточке.',en:'Candidate marked as Not Interested / Lost. The reason is saved in the profile.'}},
+      finish_nurture:{finish:true,outcome:'nurture',say:{ru:'Кандидат пока не готов по технике. Follow-up сохранён для повторного контакта.',en:'Candidate is not equipment-ready yet. A follow-up is saved for future contact.'}},
+      finish_qualified:{finish:true,outcome:'qualified',say:{ru:'Кандидат квалифицирован. Следующий шаг — получить документы и отправить их на insurance quote.',en:'Candidate qualified. The next step is to collect documents and request an insurance quote.'}},
+      finish_thinking:{finish:true,outcome:'thinking',say:{ru:'Кандидату нужно время. Follow-up сохранён, чтобы продолжить разговор.',en:'Candidate needs time. A follow-up has been saved.'}}
+    };
+
+    function renderCalls() {
+      const c=candidateById(ui.callCandidateId);
+      if(!c) {
+        const available=db.candidates.filter(x=>x.status!=='active'&&x.status!=='lost').sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+        return `<div class="card call-selector"><div class="section-header"><div><div class="section-title">Выберите кандидата для звонка</div><div class="section-note">Или создайте нового лида перед началом разговора</div></div><button class="btn btn-primary" data-action="new-candidate-call">＋ Новый кандидат</button></div>${available.length?`<div class="candidate-choice-grid">${available.map(x=>`<button class="candidate-choice" data-start-call="${x.id}"><div class="person"><div class="avatar">${initials(x)}</div><div><strong>${esc(fullName(x))}</strong><small>${esc([x.city,x.state].filter(Boolean).join(', ')||x.phone||'Новый лид')}</small></div></div><div style="margin-top:12px">${badgeStatus(x.status)}</div></button>`).join('')}</div>`:emptyState('Нет кандидатов для звонка','Создайте нового кандидата и начните квалификацию.')}</div>`;
+      }
+      const step=callSteps[c.call.stepId]||callSteps.start; const lang=c.call.language||'ru'; const historyLen=c.call.history.length; const pct=Math.min(100,Math.round(historyLen/16*100));
+      return `<div class="call-layout">
+        <div class="card call-card">
+          <div class="call-top"><div style="flex:1"><div class="call-progress-label">Квалификационный звонок · ${historyLen+1} шаг</div><div class="progress"><div style="width:${pct}%"></div></div></div><div style="display:flex;gap:8px;margin-left:14px"><select id="callLanguage" style="width:130px"><option value="ru" ${lang==='ru'?'selected':''}>Русский</option><option value="en" ${lang==='en'?'selected':''}>English</option></select><button class="btn icon-btn" data-action="close-call">×</button></div></div>
+          <div class="call-body">
+            <span class="script-label">● HR говорит</span>
+            <div class="script-text">${esc((step.say?.[lang]||step.say?.ru||'').replace('[HR NAME]',db.settings.hrName||'HR Manager').replace('[COMPANY]',db.settings.companyName||'Sofia Logistics LLC'))}</div>
+            ${step.help?`<div class="script-help">${esc(step.help)}</div>`:''}
+            <div id="callAnswerArea">${renderStepInput(c,step,lang)}</div>
+            <div class="call-footer"><button class="btn" data-action="call-back" ${c.call.history.length?'':'disabled'}>← Назад</button>${step.finish?`<button class="btn btn-primary" data-action="complete-call">Завершить и сохранить</button>`:step.type==='fields'?`<button class="btn btn-primary" data-action="call-next">Сохранить и продолжить →</button>`:'<span class="section-note" style="align-self:center">Выберите ответ кандидата</span>'}</div>
+          </div>
+        </div>
+        <div class="grid live-summary">
+          <div class="card card-pad"><div class="info-title">Кандидат <button class="btn btn-small" data-open-candidate="${c.id}">Открыть</button></div><div class="person"><div class="avatar">${initials(c)}</div><div><strong>${esc(fullName(c))}</strong><small>${esc(c.phone||c.email||'Контакт ещё не записан')}</small></div></div><div style="margin-top:15px">${badgeStatus(c.status)}</div></div>
+          <div class="card card-pad"><div class="info-title">Live summary</div><div class="summary-list">${liveSummary(c)}</div></div>
+          <div class="card card-pad"><div class="info-title">Заметки во время звонка</div><textarea id="liveCallNotes" placeholder="Свободные комментарии...">${esc(c.call.answers.liveNotes||'')}</textarea><button class="btn btn-small" style="margin-top:8px;width:100%" data-action="save-live-notes">Сохранить заметки</button></div>
+        </div>
+      </div>`;
+    }
+
+    function renderStepInput(c,step,lang) {
+      if(step.finish) return `<div class="script-help" style="border-left-color:var(--green);background:#effbf6"><strong>Результат готов к сохранению.</strong><br>Проверьте live summary и завершите звонок.</div>`;
+      if(step.type==='options') return `<div class="answer-options">${step.options.map(o=>`<button class="btn answer-btn" data-call-option="${esc(o.v)}" data-next="${o.next}" data-key="${step.key}">${esc(o[lang]||o.ru)}</button>`).join('')}</div>`;
+      if(step.type==='fields') return `<div class="call-fields"><div class="field-grid">${step.fields.map(f=>callField(c,f)).join('')}</div></div>`;
+      return '';
+    }
+
+    function getPath(obj,path) { return path.split('.').reduce((o,k)=>o?.[k],obj); }
+    function setPath(obj,path,value) { const parts=path.split('.'); let o=obj; parts.slice(0,-1).forEach(k=>{if(!o[k])o[k]={};o=o[k]});o[parts.at(-1)]=value; }
+    function callField(c,[key,type,label]) {
+      const existing=getPath(c,key) || c.call.answers[key] || '';
+      const common=`data-call-field="${key}"`;
+      if(type==='textarea') return `<label class="field-span">${label}<textarea ${common}>${esc(existing)}</textarea></label>`;
+      if(type==='state') return `<label>${label}<select ${common}><option value="">Выберите</option>${states.map(s=>`<option ${existing===s?'selected':''}>${s}</option>`).join('')}</select></label>`;
+      if(type.startsWith('select:')) { const opts=type.split(':')[1].split('|'); return `<label>${label}<select ${common}><option value="">Выберите</option>${opts.map(o=>`<option ${existing===o?'selected':''}>${o}</option>`).join('')}</select></label>`; }
+      return `<label>${label}<input type="${type}" ${common} value="${esc(existing)}"></label>`;
+    }
+
+    function liveSummary(c) {
+      const rows=[['Локация',[c.city,c.state,c.zip].filter(Boolean).join(', ')],['Формат',c.workPreference],['Home time',c.homeTime],['Truck',[c.truck.make,c.truck.model,c.truck.year].filter(Boolean).join(' ')],['Trailer',[c.trailer.make,c.trailer.model,c.trailer.year].filter(Boolean).join(' ')],['Опыт',c.carHaulingYears?c.carHaulingYears+' years car hauling':''],['CDL',c.cdl],['Дата старта',fmtDate(c.startDate)],['Score',c.score]];
+      return rows.map(([l,v])=>`<div class="summary-row"><span>${l}</span><strong>${esc(val(v))}</strong></div>`).join('');
+    }
+
+    function renderPipeline() {
+      const q=ui.pipelineSearch.toLowerCase();
+      return `<div class="toolbar"><div class="searchbox"><span>⌕</span><input id="pipelineSearch" placeholder="Поиск в воронке..." value="${esc(ui.pipelineSearch)}"></div><button class="btn" data-action="new-candidate">＋ Новый кандидат</button></div><div class="kanban">${pipelineStatuses.map(st=>{
+        const list=db.candidates.filter(c=>c.status===st&&(!q||[fullName(c),c.city,c.state,c.phone].join(' ').toLowerCase().includes(q)));
+        return `<div class="kanban-col" data-drop-status="${st}"><div class="kanban-head"><strong>${esc(statusMap[st])}</strong><span class="kanban-count">${list.length}</span></div><div class="kanban-cards">${list.map(c=>`<div class="kanban-card" draggable="true" data-drag-candidate="${c.id}" data-open-candidate="${c.id}"><div class="name">${esc(fullName(c))}</div><div class="meta">${esc([c.city,c.state].filter(Boolean).join(', ')||'Локация не указана')}</div><div class="meta">${esc(c.workPreference||'Формат не выбран')}</div><div class="foot"><span class="badge badge-yellow">${esc(c.truck.make||'No truck')}</span><div class="score ${scoreClass(c.score)}" style="width:31px;height:31px">${c.score}</div></div></div>`).join('')}</div></div>`;
+      }).join('')}</div>`;
+    }
+
+    function renderFollowups() {
+      const all=[...db.followups].filter(f=>ui.followFilter==='all'||f.status===ui.followFilter).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+      const overdue=all.filter(f=>f.status==='open'&&f.date<todayISO()), today=all.filter(f=>f.date===todayISO()), upcoming=all.filter(f=>f.date>todayISO());
+      return `<div class="section-header"><div><div class="section-title">План контактов</div><div class="section-note">Открытых задач: ${db.followups.filter(f=>f.status==='open').length}</div></div><button class="btn btn-primary" data-action="quick-followup">＋ Новый follow-up</button></div>
+      <div class="toolbar"><button class="btn btn-small ${ui.followFilter==='open'?'btn-primary':''}" data-follow-filter="open">Открытые</button><button class="btn btn-small ${ui.followFilter==='done'?'btn-primary':''}" data-follow-filter="done">Выполненные</button><button class="btn btn-small ${ui.followFilter==='all'?'btn-primary':''}" data-follow-filter="all">Все</button></div>
+      <div class="grid three-col">
+        ${followColumn('Просрочено',overdue,'badge-red')}${followColumn('Сегодня',today,'badge-yellow')}${followColumn('Предстоящие',upcoming,'badge-blue')}
+      </div>`;
+    }
+    function followColumn(title,list,badge){return `<div class="card card-pad"><div class="section-header"><div class="section-title">${title}</div><span class="badge ${badge}">${list.length}</span></div>${list.length?`<div class="follow-list">${list.map(f=>followItem(f,false)).join('')}</div>`:'<div class="section-note" style="padding:18px 0">Нет задач</div>'}</div>`}
+    function followItem(f,compact){const c=candidateById(f.candidateId);return `<div class="follow-item"><div class="follow-time">${esc(f.time||'—')}<div style="font-size:9px;color:var(--muted);margin-top:3px">${fmtDate(f.date).split(' ').slice(0,2).join(' ')}</div></div><div class="follow-main" ${c?`data-open-candidate="${c.id}" style="cursor:pointer"`:''}><strong>${esc(c?fullName(c):'Кандидат удалён')}</strong><span>${esc(f.type)} · ${esc(f.note||'Без комментария')}</span></div>${f.status==='open'?`<div class="follow-actions"><button class="btn btn-small" title="Выполнить" data-complete-follow="${f.id}">✓</button>${compact?'':`<button class="btn btn-small" title="Перенести на завтра" data-snooze-follow="${f.id}">+1</button>`}</div>`:`<span class="badge badge-green">Done</span>`}</div>`}
+
+    function renderSettings() {
+      return `<div class="card card-pad">
+        <div class="section-title">Основные параметры</div>
+        <div class="settings-row"><div class="settings-copy"><strong>Название компании</strong><p>Используется в скрипте звонка и интерфейсе.</p></div><input id="settingCompany" value="${esc(db.settings.companyName)}"></div>
+        <div class="settings-row"><div class="settings-copy"><strong>Имя HR</strong><p>Автоматически подставляется в начало скрипта.</p></div><input id="settingHr" value="${esc(db.settings.hrName)}"></div>
+        <div class="settings-row"><div class="settings-copy"><strong>Резервная копия</strong><p>Экспортируйте всю локальную базу в JSON и храните копию отдельно.</p></div><div style="display:flex;gap:9px;flex-wrap:wrap"><button class="btn btn-primary" data-action="export-json">⇩ Экспорт базы</button><button class="btn" data-action="import-json">⇧ Импорт базы</button><button class="btn" data-action="export-csv">⇩ Кандидаты CSV</button></div></div>
+        <div class="settings-row"><div class="settings-copy"><strong>Демонстрационные данные</strong><p>Удалить только примеры, не затрагивая добавленных вами кандидатов.</p></div><div><button class="btn btn-danger" data-action="clear-demo">Удалить DEMO-кандидатов</button></div></div>
+        <div class="settings-row"><div class="settings-copy"><strong>Полный сброс</strong><p>Удалит кандидатов, follow-ups и историю на этом компьютере. Перед сбросом сделайте экспорт.</p></div><div><button class="btn btn-danger" data-action="reset-all">Удалить всю локальную базу</button></div></div>
+      </div>
+      <div class="card card-pad" style="margin-top:18px"><div class="section-title">Как хранятся данные</div><div class="section-note" style="line-height:1.7;margin-top:10px">Система работает полностью локально и сохраняет информацию в хранилище браузера на этом компьютере. Данные не отправляются в интернет. Для надёжности регулярно используйте экспорт базы. При очистке данных браузера локальная база может быть удалена.</div></div>`;
+    }
+
+    function wireViewEvents() {
+      document.querySelectorAll('[data-open-candidate]').forEach(el=>el.addEventListener('click',e=>{ if(e.target.closest('[data-complete-follow],[data-snooze-follow]'))return; ui.selectedCandidateId=el.dataset.openCandidate;ui.view='candidate';render(); }));
+      document.querySelectorAll('[data-start-call]').forEach(el=>el.addEventListener('click',()=>{ui.callCandidateId=el.dataset.startCall;ui.view='calls';render();}));
+      const search=document.getElementById('candidateSearch'); if(search) search.addEventListener('input',e=>{ui.filters.search=e.target.value;render();});
+      const fs=document.getElementById('filterState'); if(fs) fs.addEventListener('change',e=>{ui.filters.state=e.target.value;render();});
+      const fw=document.getElementById('filterWork'); if(fw) fw.addEventListener('change',e=>{ui.filters.work=e.target.value;render();});
+      const fst=document.getElementById('filterStatus'); if(fst) fst.addEventListener('change',e=>{ui.filters.status=e.target.value;render();});
+      const ps=document.getElementById('profileStatus'); if(ps) ps.addEventListener('change',e=>updateCandidateStatus(e.target.dataset.id,e.target.value));
+      document.querySelectorAll('[data-doc]').forEach(sel=>sel.addEventListener('change',e=>{const c=candidateById(e.target.dataset.id);c.docs[e.target.dataset.doc]=e.target.value;touch(c);save();addActivity(c.id,`${docLabels[e.target.dataset.doc]}: ${e.target.options[e.target.selectedIndex].text}`,'document');toast('Статус документа обновлён');}));
+      const ins=document.getElementById('insuranceStatus'); if(ins) ins.addEventListener('change',e=>{const c=candidateById(e.target.dataset.id);c.insurance.status=e.target.value;touch(c);save();addActivity(c.id,`Insurance status: ${e.target.value}`,'insurance');toast('Insurance status обновлён');});
+      const iq=document.getElementById('insuranceQuote'); if(iq) iq.addEventListener('change',e=>{const c=candidateById(e.target.dataset.id);c.insurance.weeklyQuote=e.target.value;touch(c);save();toast('Quote сохранён');});
+      const pl=document.getElementById('pipelineSearch'); if(pl) pl.addEventListener('input',e=>{ui.pipelineSearch=e.target.value;render();});
+      document.querySelectorAll('[data-follow-filter]').forEach(x=>x.addEventListener('click',()=>{ui.followFilter=x.dataset.followFilter;render();}));
+      document.querySelectorAll('[data-complete-follow]').forEach(x=>x.addEventListener('click',e=>{e.stopPropagation();completeFollowup(x.dataset.completeFollow);}));
+      document.querySelectorAll('[data-snooze-follow]').forEach(x=>x.addEventListener('click',e=>{e.stopPropagation();snoozeFollowup(x.dataset.snoozeFollow);}));
+      wireKanban(); wireCall(); wireSettings();
+    }
+
+    function wireKanban(){
+      document.querySelectorAll('[data-drag-candidate]').forEach(card=>card.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',card.dataset.dragCandidate);e.dataTransfer.effectAllowed='move';}));
+      document.querySelectorAll('[data-drop-status]').forEach(col=>{
+        col.addEventListener('dragover',e=>{e.preventDefault();col.classList.add('dragover');}); col.addEventListener('dragleave',()=>col.classList.remove('dragover'));
+        col.addEventListener('drop',e=>{e.preventDefault();col.classList.remove('dragover');const id=e.dataTransfer.getData('text/plain');updateCandidateStatus(id,col.dataset.dropStatus);});
+      });
+    }
+
+    function wireCall(){
+      const lang=document.getElementById('callLanguage'); if(lang) lang.addEventListener('change',e=>{const c=candidateById(ui.callCandidateId);c.call.language=e.target.value;save();render();});
+      document.querySelectorAll('[data-call-option]').forEach(btn=>btn.addEventListener('click',()=>advanceOption(btn.dataset.key,btn.dataset.callOption,btn.dataset.next)));
+    }
+
+    function wireSettings(){
+      const co=document.getElementById('settingCompany'); if(co) co.addEventListener('change',e=>{db.settings.companyName=e.target.value.trim()||'Sofia Logistics LLC';save();toast('Название сохранено');});
+      const hr=document.getElementById('settingHr'); if(hr) hr.addEventListener('change',e=>{db.settings.hrName=e.target.value.trim()||'HR Manager';save();toast('Имя HR сохранено');});
+    }
+
+    function advanceOption(key,value,next){
+      const c=candidateById(ui.callCandidateId), current=c.call.stepId;
+      c.call.answers[key]=value; setCandidateFromAnswer(c,key,value);
+      c.call.history.push(current); c.call.stepId=next; c.lastContact=nowISO(); touch(c); c.score=calculateScore(c); save(); render();
+    }
+    function setCandidateFromAnswer(c,key,value){
+      if(['workPreference','homeTime'].includes(key)) c[key]=value;
+      if(key==='preferredAfterPitch') c.workPreference=value;
+      if(key==='documentsReady'&&value==='Today'){c.docs.license='requested';c.docs.truckRegistration='requested';c.docs.trailerRegistration='requested';}
+    }
+    function advanceFields(){
+      const c=candidateById(ui.callCandidateId), step=callSteps[c.call.stepId];
+      document.querySelectorAll('[data-call-field]').forEach(el=>{const key=el.dataset.callField;const v=el.value.trim(); if(key.includes('.')||Object.prototype.hasOwnProperty.call(c,key)) setPath(c,key,v); else c.call.answers[key]=v;});
+      c.call.history.push(c.call.stepId); c.call.stepId=step.next; c.lastContact=nowISO(); touch(c); c.score=calculateScore(c); save(); render();
+    }
+    function callBack(){const c=candidateById(ui.callCandidateId);if(!c.call.history.length)return;c.call.stepId=c.call.history.pop();save();render();}
+    function completeCall(){
+      const c=candidateById(ui.callCandidateId), step=callSteps[c.call.stepId];
+      c.call.completed=true; c.lastContact=nowISO();
+      const outcome=step.outcome;
+      if(outcome==='qualified'){c.status='qualified';c.docs.license=c.docs.license==='not_requested'?'requested':c.docs.license;c.docs.truckRegistration=c.docs.truckRegistration==='not_requested'?'requested':c.docs.truckRegistration;c.docs.trailerRegistration=c.docs.trailerRegistration==='not_requested'?'requested':c.docs.trailerRegistration;}
+      if(outcome==='lost')c.status='lost';
+      if(outcome==='followup'||outcome==='message')c.status='contact_attempted';
+      if(outcome==='thinking')c.status='initial_contact';
+      if(outcome==='nurture')c.status='initial_contact';
+      const a=c.call.answers;
+      if(a.followDate) createFollowup(c.id,a.followDate,a.followTime||'10:00',a.preferredContact||'Call',a.followNote||'Follow-up после квалификационного звонка',false);
+      if(outcome==='message'&&!a.followDate) createFollowup(c.id,addDays(1),'10:00',a.preferredContact||'Message','Проверить реакцию после отправки информации',false);
+      if(a.liveNotes){c.notes=[c.notes,a.liveNotes].filter(Boolean).join('\n\n');}
+      c.score=calculateScore(c);touch(c);addActivity(c.id,`Квалификационный звонок завершён: ${outcome}`,'call');save();toast('Звонок сохранён в карточке кандидата');ui.callCandidateId=null;ui.selectedCandidateId=c.id;ui.view='candidate';render();
+    }
+
+    function updateCandidateStatus(id,status){const c=candidateById(id);if(!c)return;const old=c.status;c.status=status;touch(c);save();addActivity(id,`Статус: ${statusMap[old]} → ${statusMap[status]}`,'status');toast(`Кандидат перемещён: ${statusMap[status]}`);render();}
+    function completeFollowup(id){const f=db.followups.find(x=>x.id===id);if(!f)return;f.status='done';f.completedAt=nowISO();const c=candidateById(f.candidateId);if(c){c.lastContact=nowISO();touch(c);addActivity(c.id,`Follow-up выполнен: ${f.note}`,'followup');}save();toast('Follow-up выполнен');render();}
+    function snoozeFollowup(id){const f=db.followups.find(x=>x.id===id);if(!f)return;const d=new Date(`${f.date}T12:00:00`);d.setDate(d.getDate()+1);f.date=d.toISOString().slice(0,10);save();toast('Перенесено на следующий день');render();}
+    function createFollowup(candidateId,date,time,type,note,doRender=true){db.followups.push({id:uid('fu'),candidateId,date,time,type,note,status:'open',createdAt:nowISO()});const c=candidateById(candidateId);if(c){c.nextFollowUp=date;touch(c);addActivity(c.id,`Добавлен follow-up: ${fmtDate(date)} ${time}`,'followup');}save();if(doRender){toast('Follow-up добавлен');render();}}
+
+    function openCandidateModal(existing=null, startCallAfter=false){
+      const c=existing?JSON.parse(JSON.stringify(existing)):blankCandidate();
+      const title=existing?'Редактировать кандидата':'Новый кандидат';
+      showModal(title,`<div class="field-grid-3">
+        <label>Имя<input id="mFirst" value="${esc(c.firstName)}"></label><label>Фамилия<input id="mLast" value="${esc(c.lastName)}"></label><label>Язык<select id="mLanguage">${['Russian','Ukrainian','English'].map(x=>`<option ${c.language===x?'selected':''}>${x}</option>`).join('')}</select></label>
+        <label>Телефон<input id="mPhone" value="${esc(c.phone)}"></label><label>Email<input id="mEmail" value="${esc(c.email)}"></label><label>Источник<input id="mSource" placeholder="Facebook, Telegram, Referral..." value="${esc(c.source)}"></label>
+        <label>City<input id="mCity" value="${esc(c.city)}"></label><label>State<select id="mState"><option value="">Выберите</option>${states.map(s=>`<option ${c.state===s?'selected':''}>${s}</option>`).join('')}</select></label><label>ZIP<input id="mZip" value="${esc(c.zip)}"></label>
+        <label>Формат<select id="mWork"><option value="">Не выбран</option>${['Local','OTR','Both','Not sure'].map(x=>`<option ${c.workPreference===x?'selected':''}>${x}</option>`).join('')}</select></label><label>Home time<input id="mHome" value="${esc(c.homeTime)}"></label><label>Дата старта<input type="date" id="mStart" value="${esc(c.startDate)}"></label>
+        <label>Truck make<input id="mTruckMake" value="${esc(c.truck.make)}"></label><label>Truck model<input id="mTruckModel" value="${esc(c.truck.model)}"></label><label>Truck year<input type="number" id="mTruckYear" value="${esc(c.truck.year)}"></label>
+        <label>Trailer make<input id="mTrailerMake" value="${esc(c.trailer.make)}"></label><label>Trailer model<input id="mTrailerModel" value="${esc(c.trailer.model)}"></label><label>Trailer year<input type="number" id="mTrailerYear" value="${esc(c.trailer.year)}"></label>
+        <label class="field-span">Комментарий<textarea id="mNotes">${esc(c.notes)}</textarea></label>
+      </div>`,[{label:'Отмена',cls:'',action:'close-modal'},{label:existing?'Сохранить':'Создать кандидата',cls:'btn-primary',action:'save-candidate'}],'wide');
+      document.querySelector('[data-modal-action="save-candidate"]').addEventListener('click',()=>{
+        Object.assign(c,{firstName:gv('mFirst'),lastName:gv('mLast'),language:gv('mLanguage'),phone:gv('mPhone'),email:gv('mEmail'),source:gv('mSource'),city:gv('mCity'),state:gv('mState'),zip:gv('mZip'),workPreference:gv('mWork'),homeTime:gv('mHome'),startDate:gv('mStart'),notes:gv('mNotes')});
+        Object.assign(c.truck,{make:gv('mTruckMake'),model:gv('mTruckModel'),year:gv('mTruckYear')});Object.assign(c.trailer,{make:gv('mTrailerMake'),model:gv('mTrailerModel'),year:gv('mTrailerYear')});
+        c.score=calculateScore(c);touch(c);
+        if(!existing){
+          db.candidates.unshift(c);
+          addActivity(c.id,'Кандидат создан','create');
+        } else {
+          const idx=db.candidates.findIndex(x=>x.id===existing.id);
+          if(idx>=0) db.candidates[idx]=c;
+          addActivity(c.id,'Карточка кандидата обновлена','edit');
+        }
+        save();closeModal();toast(existing?'Кандидат обновлён':'Кандидат добавлен');
+        if(startCallAfter){ui.callCandidateId=c.id;ui.view='calls';}else{ui.selectedCandidateId=c.id;ui.view='candidate';} render();
+      });
+    }
+
+    function openFollowupModal(candidateId=''){
+      showModal('Новый follow-up',`<div class="field-grid"><label class="field-span">Кандидат<select id="fuCandidate"><option value="">Выберите кандидата</option>${db.candidates.map(c=>`<option value="${c.id}" ${candidateId===c.id?'selected':''}>${esc(fullName(c))} · ${esc([c.city,c.state].filter(Boolean).join(', '))}</option>`).join('')}</select></label><label>Дата<input id="fuDate" type="date" value="${todayISO()}"></label><label>Время<input id="fuTime" type="time" value="10:00"></label><label>Тип<select id="fuType">${['Call','WhatsApp','SMS','Email'].map(x=>`<option>${x}</option>`).join('')}</select></label><label class="field-span">Комментарий<textarea id="fuNote" placeholder="Что нужно сделать или уточнить"></textarea></label></div>`,[{label:'Отмена',action:'close-modal'},{label:'Добавить',cls:'btn-primary',action:'save-followup'}]);
+      document.querySelector('[data-modal-action="save-followup"]').addEventListener('click',()=>{const cid=gv('fuCandidate');if(!cid){toast('Выберите кандидата');return}createFollowup(cid,gv('fuDate'),gv('fuTime'),gv('fuType'),gv('fuNote'));closeModal();});
+    }
+
+    function showModal(title,body,buttons=[],wide=''){
+      document.getElementById('modalRoot').innerHTML=`<div class="modal-backdrop"><div class="modal ${wide}"><div class="modal-head"><strong>${title}</strong><button class="btn icon-btn" data-modal-action="close-modal">×</button></div><div class="modal-body">${body}</div><div class="modal-foot">${buttons.map(b=>`<button class="btn ${b.cls||''}" data-modal-action="${b.action}">${b.label}</button>`).join('')}</div></div></div>`;
+      document.querySelectorAll('[data-modal-action="close-modal"]').forEach(x=>x.addEventListener('click',closeModal));
+      document.querySelector('.modal-backdrop').addEventListener('click',e=>{if(e.target.classList.contains('modal-backdrop'))closeModal();});
+    }
+    function closeModal(){document.getElementById('modalRoot').innerHTML=''}
+    function gv(id){return document.getElementById(id)?.value?.trim()||''}
+
+    function exportJSON(){const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});downloadBlob(blob,`Sofia_Recruiting_Hub_Backup_${todayISO()}.json`);toast('Резервная копия создана');}
+    function exportCSV(){
+      const headers=['First Name','Last Name','Phone','Email','Language','Source','City','State','ZIP','Work Preference','Home Time','Status','Score','Truck','Trailer','CDL','Experience Years','Car Hauling Years','Start Date','Notes'];
+      const rows=db.candidates.map(c=>[c.firstName,c.lastName,c.phone,c.email,c.language,c.source,c.city,c.state,c.zip,c.workPreference,c.homeTime,statusMap[c.status],c.score,[c.truck.year,c.truck.make,c.truck.model].filter(Boolean).join(' '),[c.trailer.year,c.trailer.make,c.trailer.model].filter(Boolean).join(' '),c.cdl,c.experienceYears,c.carHaulingYears,c.startDate,c.notes]);
+      const csv=[headers,...rows].map(r=>r.map(x=>`"${String(x??'').replaceAll('"','""')}"`).join(',')).join('\r\n');downloadBlob(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),`Sofia_Candidates_${todayISO()}.csv`);toast('CSV экспортирован');
+    }
+    function downloadBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+
+    function importJSON(file){const reader=new FileReader();reader.onload=()=>{try{const parsed=JSON.parse(reader.result);if(!parsed.candidates||!parsed.followups)throw new Error('Invalid');db=parsed;save();toast('База успешно импортирована');render();}catch(e){toast('Файл не похож на резервную копию Sofia Recruiting Hub');}};reader.readAsText(file);}
+
+    function confirmDialog(title,text,onConfirm){showModal(title,`<div style="font-size:14px;line-height:1.65">${text}</div>`,[{label:'Отмена',action:'close-modal'},{label:'Подтвердить',cls:'btn-danger',action:'confirm'}]);document.querySelector('[data-modal-action="confirm"]').addEventListener('click',()=>{closeModal();onConfirm();});}
+
+    function handleAction(action,el){
+      if(action==='new-candidate')openCandidateModal();
+      if(action==='new-candidate-call')openCandidateModal(null,true);
+      if(action==='quick-followup')openFollowupModal(el.dataset.candidate||'');
+      if(action==='start-call'){ui.callCandidateId=null;ui.view='calls';render();}
+      if(action==='start-call-candidate'){const c=candidateById(el.dataset.id);if(c.call.completed){c.call={stepId:'start',history:[],answers:{},completed:false,language:c.call.language||'ru'};}ui.callCandidateId=el.dataset.id;ui.view='calls';render();}
+      if(action==='edit-candidate')openCandidateModal(candidateById(el.dataset.id));
+      if(action==='delete-candidate'){
+        const c=candidateById(el.dataset.id);
+        if(c) confirmDialog('Удалить кандидата?',`Будет удалена карточка <strong>${esc(fullName(c))}</strong>, связанные follow-ups и история.`,()=>{
+          db.candidates=db.candidates.filter(x=>x.id!==c.id);
+          db.followups=db.followups.filter(x=>x.candidateId!==c.id);
+          db.activities=db.activities.filter(x=>x.candidateId!==c.id);
+          save(); ui.selectedCandidateId=null; ui.view='candidates'; toast('Кандидат удалён'); render();
+        });
+      }
+      if(action==='edit-notes'){const c=candidateById(el.dataset.id);showModal('Комментарии кандидата',`<textarea id="noteEdit" style="min-height:220px">${esc(c.notes)}</textarea>`,[{label:'Отмена',action:'close-modal'},{label:'Сохранить',cls:'btn-primary',action:'save-note'}]);document.querySelector('[data-modal-action="save-note"]').addEventListener('click',()=>{c.notes=gv('noteEdit');touch(c);save();addActivity(c.id,'Комментарии обновлены','note');closeModal();render();});}
+      if(action==='print-candidate')window.print();
+      if(action==='clear-filters'){ui.filters={search:'',state:'',status:'',work:''};render();}
+      if(action==='close-call'){ui.callCandidateId=null;render();}
+      if(action==='call-next')advanceFields();
+      if(action==='call-back')callBack();
+      if(action==='complete-call')completeCall();
+      if(action==='save-live-notes'){const c=candidateById(ui.callCandidateId);c.call.answers.liveNotes=document.getElementById('liveCallNotes').value;save();toast('Заметки сохранены');}
+      if(action==='export-json')exportJSON();
+      if(action==='export-csv')exportCSV();
+      if(action==='import-json')document.getElementById('importFile').click();
+      if(action==='clear-demo')confirmDialog('Удалить DEMO-кандидатов?','Будут удалены только демонстрационные карточки и связанные с ними follow-ups.',()=>{const ids=db.candidates.filter(c=>c.demo).map(c=>c.id);db.candidates=db.candidates.filter(c=>!c.demo);db.followups=db.followups.filter(f=>!ids.includes(f.candidateId));db.activities=db.activities.filter(a=>!ids.includes(a.candidateId));save();toast('Демонстрационные данные удалены');render();});
+      if(action==='reset-all')confirmDialog('Удалить всю локальную базу?','Это действие нельзя отменить. Рекомендуется сначала экспортировать резервную копию.',()=>{db={version:VERSION,settings:{companyName:'Sofia Logistics LLC',hubName:'Sofia Recruiting Hub',hrName:'HR Manager',defaultScriptLanguage:'ru'},candidates:[],followups:[],activities:[]};save();ui={...ui,view:'dashboard',selectedCandidateId:null,callCandidateId:null};toast('Локальная база очищена');render();});
+    }
+
+    document.addEventListener('click',e=>{
+      const nav=e.target.closest('[data-nav]'); if(nav){ui.view=nav.dataset.nav;if(ui.view!=='candidate')ui.selectedCandidateId=null;document.getElementById('sidebar').classList.remove('open');document.getElementById('mobileOverlay').classList.remove('show');render();return;}
+      const act=e.target.closest('[data-action]'); if(act){handleAction(act.dataset.action,act);return;}
+    });
+    document.getElementById('importFile').addEventListener('change',e=>{if(e.target.files[0])importJSON(e.target.files[0]);e.target.value='';});
+    document.getElementById('mobileMenuBtn').addEventListener('click',()=>{document.getElementById('sidebar').classList.add('open');document.getElementById('mobileOverlay').classList.add('show');});
+    document.getElementById('mobileOverlay').addEventListener('click',()=>{document.getElementById('sidebar').classList.remove('open');document.getElementById('mobileOverlay').classList.remove('show');});
+
+    render();
+  })();
+  </script>
+</body>
+</html>
