@@ -1,27 +1,42 @@
-SOFIA RECRUITING HUB — ЛОКАЛЬНАЯ HR-СИСТЕМА
+SOFIA RECRUITING HUB - NEXT.JS + SUPABASE
 
-Быстрый запуск:
-1. Распакуйте ZIP-архив и откройте папку Sofia_Recruiting_Hub.
-2. Дважды нажмите на файл index.html.
-3. Система откроется в браузере Chrome, Edge или Safari.
+Проект переведен со статического index.html на Next.js, чтобы нормально деплоиться на Vercel и работать с Supabase.
 
-Что умеет система:
-- хранит базу кандидатов локально на компьютере;
-- интерактивно ведёт HR по русскому или английскому скрипту звонка;
-- сохраняет ответы в карточку кандидата;
-- отслеживает Local / OTR, штат, ZIP, опыт, truck и trailer;
-- ведёт этапы insurance, documents, safety, dispatch и first load;
-- показывает Kanban-воронку с drag & drop;
-- создаёт follow-ups и напоминания;
-- экспортирует базу в JSON и кандидатов в CSV;
-- импортирует резервную копию JSON.
+Что внутри:
+- Next.js app router;
+- Supabase Auth login/signup;
+- хранение кандидатов, follow-ups, документов, insurance, call state и активности в Supabase;
+- SQL-схема в файле supabase_schema.sql;
+- Vercel env-переменные через .env.example.
 
-ВАЖНО О ДАННЫХ:
-Данные хранятся в локальном хранилище браузера на этом компьютере. Они не отправляются в интернет.
-Регулярно открывайте Настройки → Экспорт базы и сохраняйте JSON-файл в надёжном месте.
-Очистка истории/данных браузера может удалить локальную базу.
+Первичная настройка Supabase:
+1. Создайте проект в Supabase.
+2. Откройте SQL Editor.
+3. Вставьте весь код из supabase_schema.sql и нажмите Run.
+4. В Supabase Auth создайте пользователя или разрешите signup.
 
-Первый запуск содержит демонстрационных кандидатов. Их можно удалить:
-Настройки → Удалить DEMO-кандидатов.
+Локальный запуск:
+1. Установите зависимости:
+   npm install
 
-Рекомендуемый браузер: Google Chrome или Microsoft Edge.
+2. Создайте .env.local по примеру .env.example:
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+
+3. Запустите:
+   npm run dev
+
+4. Откройте:
+   http://localhost:3000
+
+Vercel:
+1. Подключите GitHub repo к Vercel.
+2. В Project Settings -> Environment Variables добавьте:
+   NEXT_PUBLIC_SUPABASE_URL
+   NEXT_PUBLIC_SUPABASE_ANON_KEY
+3. Deploy.
+
+Важно:
+- SUPABASE_SERVICE_ROLE_KEY нельзя добавлять в frontend и нельзя делать NEXT_PUBLIC.
+- Безопасность держится на Supabase RLS policies.
+- Текущий файл index.html оставлен как legacy backup. Next.js использует app/page.jsx.

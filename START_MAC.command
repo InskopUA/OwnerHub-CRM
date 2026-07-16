@@ -1,2 +1,3 @@
-#!/bin/bash
-open "$(dirname "$0")/index.html"
+#!/bin/zsh
+cd "$(dirname "$0")"
+npm run dev
