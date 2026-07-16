@@ -147,9 +147,10 @@ function calculateScore(candidate) {
   return Math.max(0, Math.min(100, score));
 }
 
-function snakeCandidate(candidate) {
+function snakeCandidate(candidate, workspaceId) {
   return {
     id: candidate.id,
+    workspace_id: workspaceId,
     first_name: candidate.firstName,
     last_name: candidate.lastName,
     phone: candidate.phone,
@@ -198,6 +199,7 @@ function mapCandidate(row, equipment, docs, insurance, callState) {
 
   return {
     id: row.id,
+    workspaceId: row.workspace_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     firstName: row.first_name || "",
@@ -275,6 +277,7 @@ function mapCandidate(row, equipment, docs, insurance, callState) {
 function mapFollowup(row) {
   return {
     id: row.id,
+    workspaceId: row.workspace_id,
     candidateId: row.candidate_id,
     date: row.followup_date,
     time: row.followup_time?.slice(0, 5) || "",
@@ -290,6 +293,7 @@ function mapFollowup(row) {
 function mapActivity(row) {
   return {
     id: row.id,
+    workspaceId: row.workspace_id,
     candidateId: row.candidate_id,
     type: row.type || "note",
     text: row.text || "",
@@ -314,6 +318,7 @@ function scoreClass(score) {
 
 export default function RecruitingHub() {
   const [session, setSession] = useState(null);
+  const [workspace, setWorkspace] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [db, setDb] = useState({ settings: defaultSettings, candidates: [], followups: [], activities: [] });
@@ -350,14 +355,72 @@ export default function RecruitingHub() {
 
   useEffect(() => {
     if (session) loadRemoteData();
+    else {
+      setWorkspace(null);
+      setDb({ settings: defaultSettings, candidates: [], followups: [], activities: [] });
+    }
   }, [session]);
+
+  async function ensureWorkspace() {
+    if (!session?.user?.id) throw new Error("Нет активной Supabase-сессии");
+
+    const existing = await supabase
+      .from("workspaces")
+      .select("*")
+      .eq("owner_user_id", session.user.id)
+      .maybeSingle();
+
+    if (existing.error) throw existing.error;
+    if (existing.data) return existing.data;
+
+    const created = await supabase
+      .from("workspaces")
+      .insert({
+        owner_user_id: session.user.id,
+        name: defaultSettings.hubName
+      })
+      .select("*")
+      .single();
+
+    if (created.error) throw created.error;
+    return created.data;
+  }
 
   async function loadRemoteData() {
     setLoading(true);
     try {
+      const currentWorkspace = await ensureWorkspace();
+      setWorkspace(currentWorkspace);
+
+      const settingsResult = await supabase
+        .from("app_settings")
+        .select("*")
+        .eq("workspace_id", currentWorkspace.id)
+        .maybeSingle();
+
+      if (settingsResult.error) throw settingsResult.error;
+
+      if (!settingsResult.data) {
+        const insertedSettings = await supabase.from("app_settings").insert({
+          id: `settings_${currentWorkspace.id}`,
+          workspace_id: currentWorkspace.id,
+          company_name: defaultSettings.companyName,
+          hub_name: defaultSettings.hubName,
+          hr_name: defaultSettings.hrName,
+          default_script_language: defaultSettings.defaultScriptLanguage
+        });
+        if (insertedSettings.error) throw insertedSettings.error;
+      }
+
+      const candidatesResult = await supabase
+        .from("candidates")
+        .select("*")
+        .eq("workspace_id", currentWorkspace.id)
+        .order("updated_at", { ascending: false });
+
+      if (candidatesResult.error) throw candidatesResult.error;
+
       const [
-        settingsResult,
-        candidatesResult,
         equipmentResult,
         docsResult,
         insuranceResult,
@@ -365,19 +428,15 @@ export default function RecruitingHub() {
         followupsResult,
         activitiesResult
       ] = await Promise.all([
-        supabase.from("app_settings").select("*").eq("id", "default").maybeSingle(),
-        supabase.from("candidates").select("*").order("updated_at", { ascending: false }),
-        supabase.from("candidate_equipment").select("*"),
-        supabase.from("candidate_documents").select("*"),
-        supabase.from("candidate_insurance").select("*"),
-        supabase.from("candidate_call_state").select("*"),
-        supabase.from("followups").select("*").order("followup_date", { ascending: true }),
-        supabase.from("activities").select("*").order("created_at", { ascending: false }).limit(500)
+        supabase.from("candidate_equipment").select("*").eq("workspace_id", currentWorkspace.id),
+        supabase.from("candidate_documents").select("*").eq("workspace_id", currentWorkspace.id),
+        supabase.from("candidate_insurance").select("*").eq("workspace_id", currentWorkspace.id),
+        supabase.from("candidate_call_state").select("*").eq("workspace_id", currentWorkspace.id),
+        supabase.from("followups").select("*").eq("workspace_id", currentWorkspace.id).order("followup_date", { ascending: true }),
+        supabase.from("activities").select("*").eq("workspace_id", currentWorkspace.id).order("created_at", { ascending: false }).limit(500)
       ]);
 
       const errors = [
-        settingsResult.error,
-        candidatesResult.error,
         equipmentResult.error,
         docsResult.error,
         insuranceResult.error,
@@ -417,23 +476,26 @@ export default function RecruitingHub() {
   }
 
   async function addActivity(candidateId, text, type = "note") {
+    if (!workspace?.id) throw new Error("Workspace не инициализирован");
     const id = `act_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-    const row = { id, candidate_id: candidateId, text, type };
+    const row = { id, workspace_id: workspace.id, candidate_id: candidateId, text, type };
     const { error } = await supabase.from("activities").insert(row);
     if (error) throw error;
     setDb((current) => ({
       ...current,
-      activities: [{ id, candidateId, text, type, createdAt: new Date().toISOString() }, ...current.activities]
+      activities: [{ id, workspaceId: workspace.id, candidateId, text, type, createdAt: new Date().toISOString() }, ...current.activities]
     }));
   }
 
   async function saveCandidate(candidate, activityText = "Карточка кандидата обновлена", activityType = "edit") {
-    const next = { ...candidate, score: calculateScore(candidate) };
-    const { error: candidateError } = await supabase.from("candidates").upsert(snakeCandidate(next));
+    if (!workspace?.id) throw new Error("Workspace не инициализирован");
+    const next = { ...candidate, workspaceId: workspace.id, score: calculateScore(candidate) };
+    const { error: candidateError } = await supabase.from("candidates").upsert(snakeCandidate(next, workspace.id));
     if (candidateError) throw candidateError;
 
     const equipmentRows = [
       {
+        workspace_id: workspace.id,
         candidate_id: next.id,
         equipment_type: "truck",
         make: next.truck.make,
@@ -449,6 +511,7 @@ export default function RecruitingHub() {
         body_type: ""
       },
       {
+        workspace_id: workspace.id,
         candidate_id: next.id,
         equipment_type: "trailer",
         make: next.trailer.make,
@@ -470,6 +533,7 @@ export default function RecruitingHub() {
     if (equipmentError) throw equipmentError;
 
     const docRows = Object.entries(next.docs || emptyDocs()).map(([documentType, status]) => ({
+      workspace_id: workspace.id,
       candidate_id: next.id,
       document_type: documentType,
       status
@@ -480,6 +544,7 @@ export default function RecruitingHub() {
     if (docsError) throw docsError;
 
     const { error: insuranceError } = await supabase.from("candidate_insurance").upsert({
+      workspace_id: workspace.id,
       candidate_id: next.id,
       status: next.insurance.status,
       weekly_quote: next.insurance.weeklyQuote,
@@ -488,6 +553,7 @@ export default function RecruitingHub() {
     if (insuranceError) throw insuranceError;
 
     const { error: callError } = await supabase.from("candidate_call_state").upsert({
+      workspace_id: workspace.id,
       candidate_id: next.id,
       step_id: next.call.stepId,
       history: next.call.history || [],
@@ -511,7 +577,7 @@ export default function RecruitingHub() {
   }
 
   async function deleteCandidate(candidateId) {
-    const { error } = await supabase.from("candidates").delete().eq("id", candidateId);
+    const { error } = await supabase.from("candidates").delete().eq("id", candidateId).eq("workspace_id", workspace.id);
     if (error) {
       notify(error.message);
       return;
@@ -527,9 +593,11 @@ export default function RecruitingHub() {
   }
 
   async function createFollowup(candidateId, date, time, type, note) {
+    if (!workspace?.id) throw new Error("Workspace не инициализирован");
     const id = `fu_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
     const row = {
       id,
+      workspace_id: workspace.id,
       candidate_id: candidateId,
       followup_date: date,
       followup_time: time || null,
@@ -554,7 +622,8 @@ export default function RecruitingHub() {
     const { error } = await supabase
       .from("followups")
       .update({ status: "done", completed_at: completedAt })
-      .eq("id", followupId);
+      .eq("id", followupId)
+      .eq("workspace_id", workspace.id);
     if (error) {
       notify(error.message);
       return;
@@ -575,7 +644,11 @@ export default function RecruitingHub() {
     const date = new Date(`${followup.date}T12:00:00`);
     date.setDate(date.getDate() + 1);
     const nextDate = date.toISOString().slice(0, 10);
-    const { error } = await supabase.from("followups").update({ followup_date: nextDate }).eq("id", followupId);
+    const { error } = await supabase
+      .from("followups")
+      .update({ followup_date: nextDate })
+      .eq("id", followupId)
+      .eq("workspace_id", workspace.id);
     if (error) {
       notify(error.message);
       return;
@@ -600,8 +673,13 @@ export default function RecruitingHub() {
   }
 
   async function updateSettings(settings) {
+    if (!workspace?.id) {
+      notify("Workspace ещё не инициализирован");
+      return;
+    }
     const { error } = await supabase.from("app_settings").upsert({
-      id: "default",
+      id: `settings_${workspace.id}`,
+      workspace_id: workspace.id,
       company_name: settings.companyName || defaultSettings.companyName,
       hub_name: settings.hubName || defaultSettings.hubName,
       hr_name: settings.hrName || defaultSettings.hrName,

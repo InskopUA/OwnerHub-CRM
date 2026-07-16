@@ -5,6 +5,7 @@ OWNERHUB HRM - NEXT.JS + SUPABASE
 Что внутри:
 - Next.js app router;
 - Supabase Auth login/signup;
+- workspace model: один аккаунт = одна отдельная компания/система с изолированными данными;
 - хранение кандидатов, follow-ups, документов, insurance, call state и активности в Supabase;
 - SQL-схема в файле supabase_schema.sql;
 - Vercel env-переменные через .env.example.
@@ -39,4 +40,5 @@ Vercel:
 Важно:
 - SUPABASE_SERVICE_ROLE_KEY нельзя добавлять в frontend и нельзя делать NEXT_PUBLIC.
 - Безопасность держится на Supabase RLS policies.
+- Каждый пользователь видит только данные своего workspace.
 - Текущий файл index.html оставлен как legacy backup. Next.js использует app/page.jsx.
