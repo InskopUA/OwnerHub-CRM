@@ -1480,6 +1480,97 @@ New Lead → Get Lead Details → HTTP OwnerHub`}</pre>
   );
 }
 
+function LocationFields({ draft, setDraft }) {
+  const [citySuggestions, setCitySuggestions] = useState([]);
+  const [cityOpen, setCityOpen] = useState(false);
+  const [zipStatus, setZipStatus] = useState("");
+  const cityQuery = draft.city.trim();
+  const cleanZip = String(draft.zip || "").replace(/\D/g, "").slice(0, 5);
+
+  useEffect(() => {
+    if (!cityOpen || cityQuery.length < 2) {
+      setCitySuggestions([]);
+      return;
+    }
+
+    const controller = new globalThis.AbortController();
+    const query = encodeURIComponent(cityQuery);
+
+    globalThis.fetch(`/api/locations/cities?q=${query}&limit=8`, { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => setCitySuggestions(data?.cities || []))
+      .catch((error) => {
+        if (error.name !== "AbortError") setCitySuggestions([]);
+      });
+
+    return () => controller.abort();
+  }, [cityOpen, cityQuery]);
+
+  useEffect(() => {
+    if (cleanZip.length !== 5) {
+      setZipStatus("");
+      return;
+    }
+
+    const controller = new globalThis.AbortController();
+    setZipStatus("Looking up ZIP...");
+
+    globalThis.fetch(`/api/locations/zip/${cleanZip}`, { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        if (!data?.location) {
+          setZipStatus("ZIP not found");
+          return;
+        }
+
+        setDraft((current) => ({
+          ...current,
+          city: data.location.city,
+          state: data.location.state,
+          zip: data.location.zip
+        }));
+        setZipStatus("");
+      })
+      .catch((error) => {
+        if (error.name !== "AbortError") setZipStatus("ZIP not found");
+      });
+
+    return () => controller.abort();
+  }, [cleanZip, setDraft]);
+
+  const chooseCity = (location) => {
+    setDraft((current) => ({
+      ...current,
+      city: location.city,
+      state: location.state
+    }));
+    setCityOpen(false);
+    setCitySuggestions([]);
+  };
+
+  return (
+    <>
+      <div className="location-field">
+        <label>City<input value={draft.city} onFocus={() => setCityOpen(true)} onChange={(event) => {
+          setDraft((current) => ({ ...current, city: event.target.value }));
+          setCityOpen(true);
+        }} onBlur={() => setTimeout(() => setCityOpen(false), 140)} autoComplete="off" /></label>
+        {cityOpen && citySuggestions.length ? (
+          <div className="autocomplete-menu">
+            {citySuggestions.map((location) => (
+              <button type="button" key={`${location.city}-${location.state}`} onMouseDown={(event) => event.preventDefault()} onClick={() => chooseCity(location)}>
+                <strong>{location.city}</strong><span>{location.state}{location.zip ? ` · ${location.zip}` : ""}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      <label>State<select value={draft.state} onChange={(event) => setDraft((current) => ({ ...current, state: event.target.value }))}><option value="">Выберите</option>{states.map((state) => <option key={state}>{state}</option>)}</select></label>
+      <label>ZIP<input inputMode="numeric" value={draft.zip} onChange={(event) => setDraft((current) => ({ ...current, zip: event.target.value.replace(/\D/g, "").slice(0, 5) }))} />{zipStatus ? <span className={`field-hint ${zipStatus.includes("not") ? "error" : ""}`}>{zipStatus}</span> : null}</label>
+    </>
+  );
+}
+
 function CandidateModal({ candidate, onClose, onSave }) {
   const [draft, setDraft] = useState(structuredClone(candidate));
   const update = (key, value) => setDraft((current) => ({ ...current, [key]: value }));
@@ -1497,9 +1588,7 @@ function CandidateModal({ candidate, onClose, onSave }) {
             <label>Телефон<input value={draft.phone} onChange={(event) => update("phone", event.target.value)} /></label>
             <label>Email<input value={draft.email} onChange={(event) => update("email", event.target.value)} /></label>
             <label>Источник<input value={draft.source} onChange={(event) => update("source", event.target.value)} /></label>
-            <label>City<input value={draft.city} onChange={(event) => update("city", event.target.value)} /></label>
-            <label>State<select value={draft.state} onChange={(event) => update("state", event.target.value)}><option value="">Выберите</option>{states.map((state) => <option key={state}>{state}</option>)}</select></label>
-            <label>ZIP<input value={draft.zip} onChange={(event) => update("zip", event.target.value)} /></label>
+            <LocationFields draft={draft} setDraft={setDraft} />
             <label>Формат<select value={draft.workPreference} onChange={(event) => update("workPreference", event.target.value)}><option value="">Не выбран</option>{["Local", "OTR", "Both", "Not sure"].map((value) => <option key={value}>{value}</option>)}</select></label>
             <label>Home time<input value={draft.homeTime} onChange={(event) => update("homeTime", event.target.value)} /></label>
             <label>Дата старта<input type="date" value={draft.startDate} onChange={(event) => update("startDate", event.target.value)} /></label>

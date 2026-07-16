@@ -88,6 +88,14 @@ label { display: grid; gap: 7px; font-size: 12px; font-weight: 800; color: #4f51
 .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .field-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .field-span { grid-column: 1 / -1; }
+.location-field { position: relative; min-width: 0; }
+.autocomplete-menu { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 8; background: white; border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-sm); overflow: hidden; max-height: 244px; overflow-y: auto; }
+.autocomplete-menu button { width: 100%; border: 0; background: white; color: var(--ink); padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left; }
+.autocomplete-menu button:hover { background: #fffdf2; }
+.autocomplete-menu strong { font-size: 13px; }
+.autocomplete-menu span { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.field-hint { color: var(--muted); font-size: 11px; font-weight: 700; }
+.field-hint.error { color: var(--red); }
 
 .table-wrap { overflow: auto; }
 table { width: 100%; border-collapse: collapse; min-width: 900px; }
