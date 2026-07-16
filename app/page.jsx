@@ -1374,16 +1374,62 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
 }
 
 function MakeGuideModal({ webhookUrl, token, onClose }) {
+  const displayToken = token || "TOKEN_FROM_OWNERHUB_SETTINGS";
+
   return (
     <div className="modal-backdrop">
       <div className="modal wide">
-        <div className="modal-head"><strong>Make setup guide</strong><button className="btn icon-btn" onClick={onClose}>×</button></div>
+        <div className="modal-head"><strong>Make lead setup</strong><button className="btn icon-btn" onClick={onClose}>×</button></div>
         <div className="modal-body guide">
-          <div className="guide-step"><b>1. Meta Lead Form</b><p>В Meta Ads создай Instant Form для Facebook / Instagram. Instagram account должен быть professional и привязан к Facebook Page.</p></div>
-          <div className="guide-step"><b>2. Make trigger</b><p>В Make создай Scenario и добавь Facebook Lead Ads trigger: New Lead / Watch Leads. Подключи Facebook account, выбери Page и Lead Form.</p></div>
-          <div className="guide-step"><b>3. Get Lead Details</b><p>Добавь Facebook Lead Ads → Get Lead Details и передай туда Lead ID из первого модуля.</p></div>
-          <div className="guide-step"><b>4. HTTP request</b><p>Добавь HTTP → Make a request.</p><pre>{`Method: POST\nURL: ${webhookUrl}\nHeaders:\nContent-Type: application/json\nx-ownerhub-token: ${token || "YOUR_GENERATED_TOKEN"}`}</pre></div>
-          <div className="guide-step"><b>5. JSON body</b><p>В Body type выбери Raw / JSON. Если Make показывает массив полей формы, отправь его как field_data. Если нет, замапь доступные поля из Get Lead Details.</p><pre>{`{
+          <div className="guide-step guide-intro">
+            <b>Что мы собираем</b>
+            <p>Финальная цепочка в Make должна быть такой. Для каждой Facebook Lead Form лучше создать отдельный scenario.</p>
+            <pre>{`Facebook Lead Ads - New Lead
+→ Facebook Lead Ads - Get Lead Details
+→ HTTP - Make a request`}</pre>
+          </div>
+
+          <div className="guide-step">
+            <b>1. Подготовь доступы</b>
+            <p>Facebook Page должна иметь Instant Form, а твой Facebook account должен иметь доступ к лидам этой Page. Instagram-лиды работают через Facebook Page, к которой привязан Instagram professional account.</p>
+          </div>
+
+          <div className="guide-step">
+            <b>2. Первый модуль: New Lead</b>
+            <p>В Make создай Scenario и добавь Facebook Lead Ads → New Lead. Подключи Facebook connection, выбери Page из списка и выбери нужную Form. Если Page не выбирается из списка, вставляй numeric Page ID, а не название страницы.</p>
+            <pre>{`Module: Facebook Lead Ads - New Lead
+Webhook name: OwnerHub - Form Name
+Page: choose from dropdown or use numeric Page ID
+Form: choose one exact lead form`}</pre>
+          </div>
+
+          <div className="guide-step">
+            <b>3. Второй модуль: Get Lead Details</b>
+            <p>Добавь Facebook Lead Ads → Get Lead Details. В поле Lead ID нужно выбрать Lead ID из первого модуля New Lead. Не выбирай Full Name, Phone Number или Email в этом поле.</p>
+            <pre>{`Module: Facebook Lead Ads - Get Lead Details
+Page: same Page
+Form: same Form
+Lead ID: Lead ID from module 1 - New Lead`}</pre>
+          </div>
+
+          <div className="guide-step">
+            <b>4. Третий модуль: HTTP</b>
+            <p>Добавь HTTP → Make a request. Authentication type должен быть No authentication. Безопасность идет через header x-ownerhub-token.</p>
+            <pre>{`Authentication type: No authentication
+URL: ${webhookUrl}
+Method: POST
+Headers:
+  Content-Type: application/json
+  x-ownerhub-token: ${displayToken}
+Body content type: application/json
+Body input method: JSON string
+Parse response: Yes`}</pre>
+          </div>
+
+          <div className="guide-step">
+            <b>5. Body content</b>
+            <p>Вставь JSON ниже. Черные токены внутри кавычек выбирай только из второго модуля Get Lead Details. Названия руками лучше не печатать, выбирай поля из списка Make.</p>
+            <pre>{`{
   "name": "{{Full Name}}",
   "phone": "{{Phone Number}}",
   "email": "{{Email}}",
@@ -1397,8 +1443,33 @@ function MakeGuideModal({ webhookUrl, token, onClose }) {
   "trailerMake": "{{Trailer Make}}",
   "notes": "Imported from Make"
 }`}</pre></div>
-          <div className="guide-step"><b>Smart mapping</b><p>Webhook понимает разные названия полей: full_name, phone_number, city, CDL, truck_make, trailer_make, а также русские названия. Нераспознанные ответы сохраняются в комментарии кандидата.</p></div>
-          <div className="guide-step"><b>6. Test</b><p>Нажми Run once в Make и отправь тестовый лид. Успешный ответ будет ok: true. Новый кандидат появится в Candidates.</p></div>
+
+          <div className="guide-step">
+            <b>6. Smart mapping</b>
+            <p>Формы могут быть разными. Webhook понимает full_name, phone_number, email, city, state, CDL, truck_make, trailer_make, русские названия и похожие варианты. Нераспознанные ответы не теряются: они сохраняются в комментарии кандидата.</p>
+          </div>
+
+          <div className="guide-step">
+            <b>7. Если форм несколько</b>
+            <p>Создай отдельный Make scenario на каждую Facebook Lead Form. URL и token можно использовать те же, если все лиды должны попадать в этот workspace. В source лучше указывать название формы, чтобы в OwnerHub было понятно, откуда пришел лид.</p>
+            <pre>{`Scenario 1: Owner ENG Form
+New Lead → Get Lead Details → HTTP OwnerHub
+
+Scenario 2: Owner RU Form
+New Lead → Get Lead Details → HTTP OwnerHub`}</pre>
+          </div>
+
+          <div className="guide-step">
+            <b>8. Test</b>
+            <p>Нажми Run once в Make, создай тестовый лид в Meta Lead Ads Testing Tool и проверь HTTP response. Успешный ответ выглядит как ok: true. После этого кандидат появится в Candidates.</p>
+            <pre>{`Success:
+{"ok":true,"action":"created","candidate_id":"..."}`}</pre>
+          </div>
+
+          <div className="guide-step">
+            <b>Частые ошибки</b>
+            <p>Page field принимает Page из dropdown или numeric Page ID, не текстовое название. Lead ID во втором модуле должен приходить из первого модуля New Lead. Поля name, phone и email в HTTP body нужно выбирать из Get Lead Details.</p>
+          </div>
         </div>
         <div className="modal-foot"><button className="btn btn-primary" onClick={onClose}>Готово</button></div>
       </div>
