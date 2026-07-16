@@ -16,7 +16,23 @@ const defaultSettings = {
   companyName: "Sofia Logistics LLC",
   hubName: "OwnerHub HRM",
   hrName: "HR Manager",
-  defaultScriptLanguage: "ru"
+  defaultScriptLanguage: "ru",
+  offerProfile: {
+    targetRole: "Owner-Operator with open 2-car trailer",
+    equipment: "Own truck and open two-car trailer",
+    geography: "US markets where Local or OTR lanes are available",
+    localGross: "$5,000-$7,000 weekly gross",
+    otrGross: "$6,000-$8,000 weekly gross",
+    dispatchFee: "10% of gross",
+    insuranceRange: "$300-$400 weekly estimate, final quote depends on driving record",
+    paySchedule: "Every Friday with one business week hold",
+    onboardingTimeline: "Usually 5-7 days after documents and insurance approval",
+    requiredDocs: "Driver License, truck registration, trailer registration, inspections, W-9, voided check",
+    disqualifiers: "No suitable equipment, unacceptable driving record, insurance rejection, not ready for owner-operator terms",
+    doNotPromise: "Do not promise fixed gross, fixed insurance price, insurance approval, or guaranteed lanes",
+    localPitch: "Local usually means fewer miles, higher rate per mile, and more home time when the location supports it.",
+    otrPitch: "OTR usually means more miles and potentially higher total gross, with more time on the road."
+  }
 };
 
 const knowledgeCategories = ["Opening", "Qualification", "Pay & Terms", "Insurance", "Documents", "Objections", "Process", "Custom"];
@@ -152,6 +168,7 @@ const addDays = (days) => {
 const fullName = (candidate) => `${candidate.firstName || ""} ${candidate.lastName || ""}`.trim() || "Без имени";
 const initials = (candidate) => ((candidate.firstName?.[0] || "") + (candidate.lastName?.[0] || "")).toUpperCase() || "?";
 const valueOrDash = (value) => (value === undefined || value === null || value === "" ? "-" : value);
+const mergeOfferProfile = (offer = {}) => ({ ...defaultSettings.offerProfile, ...(offer && typeof offer === "object" ? offer : {}) });
 
 function fmtDate(value, withTime = false) {
   if (!value) return "-";
@@ -475,14 +492,20 @@ export default function RecruitingHub() {
       if (settingsResult.error) throw settingsResult.error;
 
       if (!settingsResult.data) {
-        const insertedSettings = await supabase.from("app_settings").insert({
+        const settingsPayload = {
           id: `settings_${currentWorkspace.id}`,
           workspace_id: currentWorkspace.id,
           company_name: defaultSettings.companyName,
           hub_name: defaultSettings.hubName,
           hr_name: defaultSettings.hrName,
-          default_script_language: defaultSettings.defaultScriptLanguage
-        });
+          default_script_language: defaultSettings.defaultScriptLanguage,
+          offer_profile: defaultSettings.offerProfile
+        };
+        let insertedSettings = await supabase.from("app_settings").insert(settingsPayload);
+        if (insertedSettings.error?.code === "42703") {
+          delete settingsPayload.offer_profile;
+          insertedSettings = await supabase.from("app_settings").insert(settingsPayload);
+        }
         if (insertedSettings.error) throw insertedSettings.error;
       }
 
@@ -556,7 +579,8 @@ export default function RecruitingHub() {
               companyName: settingsRow.company_name,
               hubName: settingsRow.hub_name,
               hrName: settingsRow.hr_name,
-              defaultScriptLanguage: settingsRow.default_script_language
+              defaultScriptLanguage: settingsRow.default_script_language,
+              offerProfile: mergeOfferProfile(settingsRow.offer_profile)
             }
           : defaultSettings,
         candidates: (candidatesResult.data || []).map((row) =>
@@ -844,20 +868,31 @@ export default function RecruitingHub() {
       notify("Workspace ещё не инициализирован");
       return;
     }
-    const { error } = await supabase.from("app_settings").upsert({
+    const settingsPayload = {
       id: `settings_${workspace.id}`,
       workspace_id: workspace.id,
       company_name: settings.companyName || defaultSettings.companyName,
       hub_name: settings.hubName || defaultSettings.hubName,
       hr_name: settings.hrName || defaultSettings.hrName,
-      default_script_language: settings.defaultScriptLanguage || "ru"
-    });
+      default_script_language: settings.defaultScriptLanguage || "ru",
+      offer_profile: mergeOfferProfile(settings.offerProfile)
+    };
+    let { error } = await supabase.from("app_settings").upsert(settingsPayload);
+    if (error?.code === "42703") {
+      delete settingsPayload.offer_profile;
+      ({ error } = await supabase.from("app_settings").upsert(settingsPayload));
+    }
     if (error) {
       notify(error.message);
       return;
     }
     setDb((current) => ({ ...current, settings }));
     notify("Настройки сохранены");
+  }
+
+  async function updateOfferProfile(offerProfile) {
+    const nextSettings = { ...db.settings, offerProfile: mergeOfferProfile(offerProfile) };
+    await updateSettings(nextSettings);
   }
 
   const selectedCandidate = useMemo(
@@ -960,6 +995,7 @@ export default function RecruitingHub() {
               openNewCandidate={() => setModal({ type: "candidate", candidate: blankCandidate(), startCallAfter: true })}
               openKnowledgeEditor={(item) => setModal({ type: "knowledge", item: item || blankKnowledgeItem() })}
               deleteKnowledgeItem={deleteKnowledgeItem}
+              updateOfferProfile={updateOfferProfile}
             />
           )}
           {ui.view === "pipeline" && (
@@ -1292,7 +1328,44 @@ function InfoSection({ title, items }) {
   return <div className="info-section"><div className="info-title">{title}</div><div className="info-grid">{items.map(([label, value]) => <div className="info-item" key={label}><span>{label}</span><strong>{valueOrDash(value)}</strong></div>)}</div></div>;
 }
 
-function KnowledgeBaseView({ knowledge, candidates, startCall, openNewCandidate, openEditor, deleteItem }) {
+function OfferBuilder({ offer, onSave }) {
+  const [draft, setDraft] = useState(mergeOfferProfile(offer));
+  const update = (key, value) => setDraft((current) => ({ ...current, [key]: value }));
+
+  useEffect(() => {
+    setDraft(mergeOfferProfile(offer));
+  }, [offer]);
+
+  const rows = [
+    ["targetRole", "Кого ищем"],
+    ["equipment", "Техника"],
+    ["geography", "География"],
+    ["localGross", "Local gross"],
+    ["otrGross", "OTR gross"],
+    ["dispatchFee", "Dispatch fee"],
+    ["insuranceRange", "Insurance"],
+    ["paySchedule", "Выплаты"],
+    ["onboardingTimeline", "Онбординг"],
+    ["requiredDocs", "Документы"],
+    ["disqualifiers", "Disqualifiers"],
+    ["doNotPromise", "Нельзя обещать"],
+    ["localPitch", "Local pitch"],
+    ["otrPitch", "OTR pitch"]
+  ];
+
+  return (
+    <div className="card card-pad offer-builder">
+      <SectionTitle title="Offer Builder" note="Единый источник правды для скрипта. Рекомендации во время звонка строятся из этих условий." action={<button className="btn btn-small btn-primary" onClick={() => onSave(draft)}>Сохранить offer</button>} />
+      <div className="offer-grid">
+        {rows.map(([key, label]) => (
+          <label key={key}>{label}<textarea value={draft[key] || ""} onChange={(event) => update(key, event.target.value)} /></label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function KnowledgeBaseView({ knowledge, candidates, offer, updateOfferProfile, startCall, openNewCandidate, openEditor, deleteItem }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const cleanQuery = query.trim().toLowerCase();
@@ -1342,6 +1415,7 @@ function KnowledgeBaseView({ knowledge, candidates, startCall, openNewCandidate,
       </div>
 
       <aside className="grid side-grid">
+        <OfferBuilder offer={offer} onSave={updateOfferProfile} />
         <div className="card card-pad">
           <SectionTitle title="Начать звонок" action={<button className="btn btn-small btn-primary" onClick={openNewCandidate}>＋ Lead</button>} />
           {candidates.length ? (
@@ -1366,7 +1440,101 @@ function KnowledgeBaseView({ knowledge, candidates, startCall, openNewCandidate,
   );
 }
 
-function CallsView({ db, ui, setUi, saveCandidate, createFollowup, notify, openNewCandidate, openKnowledgeEditor, deleteKnowledgeItem }) {
+function knowledgeMatches(item, terms) {
+  const haystack = [item.title, item.category, item.content, ...(item.tags || [])].join(" ").toLowerCase();
+  return terms.some((term) => haystack.includes(term));
+}
+
+function findKnowledge(knowledge, terms, limit = 2) {
+  return knowledge
+    .filter((item) => knowledgeMatches(item, terms))
+    .sort((a, b) => (a.sortOrder - b.sortOrder) || String(b.updatedAt).localeCompare(String(a.updatedAt)))
+    .slice(0, limit);
+}
+
+function getScriptRecommendations(candidate, step, knowledge, offerInput) {
+  const offer = mergeOfferProfile(offerInput);
+  const recommendations = [];
+  const addOffer = (title, content) => {
+    if (content) recommendations.push({ id: `offer-${title}`, source: "Offer", category: "Offer", title, content });
+  };
+  const addKnowledge = (items) => {
+    items.forEach((item) => recommendations.push({ ...item, source: "Knowledge" }));
+  };
+
+  if (step?.key === "availability" || step === callSteps.start) {
+    addKnowledge(findKnowledge(knowledge, ["opening", "intro", "первое", "касание"], 1));
+    addOffer("Target", `${offer.targetRole}. ${offer.equipment}.`);
+  }
+
+  if (step?.fields?.some(([key]) => ["city", "state", "zip", "experienceYears", "cdl"].includes(key)) || step?.key === "hasEquipment") {
+    addKnowledge(findKnowledge(knowledge, ["qualification", "checklist", "screening", "квалификация"], 2));
+  }
+
+  const wantsLocal = candidate.workPreference === "Local" || step?.key === "localReaction" || step === callSteps.local_pitch;
+  const wantsOtr = candidate.workPreference === "OTR" || step?.key === "otrReaction" || step === callSteps.otr_pitch;
+  const wantsBoth = candidate.workPreference === "Both" || step === callSteps.both_pitch || step === callSteps.difference_pitch;
+
+  if (wantsLocal || wantsBoth) addOffer("Local pitch", `${offer.localPitch} ориентир: ${offer.localGross}.`);
+  if (wantsOtr || wantsBoth) addOffer("OTR pitch", `${offer.otrPitch} ориентир: ${offer.otrGross}.`);
+
+  if ([callSteps.terms, callSteps.terms_question].includes(step)) {
+    addOffer("Terms", `Dispatch fee: ${offer.dispatchFee}. Pay schedule: ${offer.paySchedule}.`);
+    addKnowledge(findKnowledge(knowledge, ["terms", "money", "dispatch", "условия"], 2));
+  }
+
+  if ([callSteps.documents, callSteps.doc_followup, callSteps.finish_qualified].includes(step) || candidate.status === "docs_requested") {
+    addOffer("Documents", offer.requiredDocs);
+    addKnowledge(findKnowledge(knowledge, ["documents", "docs", "документы"], 1));
+  }
+
+  if (step === callSteps.safety_record || candidate.insurance?.status === "pending") {
+    addOffer("Insurance guardrail", `${offer.insuranceRange}. ${offer.doNotPromise}`);
+    addKnowledge(findKnowledge(knowledge, ["insurance", "quote", "страх"], 2));
+  }
+
+  if (step === callSteps.custom_question || step === callSteps.terms_question || step?.key?.toLowerCase().includes("reaction")) {
+    addKnowledge(findKnowledge(knowledge, ["objection", "возраж", "gross", "insurance"], 3));
+  }
+
+  if (step === callSteps.equipment_gap || !candidate.truck.make || !candidate.trailer.make) {
+    addOffer("Equipment fit", `Need: ${offer.equipment}. Disqualifiers: ${offer.disqualifiers}.`);
+  }
+
+  if (recommendations.length < 3) {
+    addOffer("Do not promise", offer.doNotPromise);
+    addKnowledge(findKnowledge(knowledge, ["process", "onboarding", "процесс"], 1));
+  }
+
+  const seen = new Set();
+  return recommendations.filter((item) => {
+    const key = `${item.source}-${item.title}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 5);
+}
+
+function ScriptRecommendations({ items }) {
+  return (
+    <div className="card card-pad recommendation-card">
+      <div className="info-title">Recommended script blocks</div>
+      {items.length ? (
+        <div className="recommendation-list">
+          {items.map((item) => (
+            <div className="recommendation-item" key={item.id}>
+              <span>{item.source} · {item.category}</span>
+              <strong>{item.title}</strong>
+              <p>{item.content}</p>
+            </div>
+          ))}
+        </div>
+      ) : <div className="section-note">Нет рекомендаций для текущего шага.</div>}
+    </div>
+  );
+}
+
+function CallsView({ db, ui, setUi, saveCandidate, createFollowup, notify, openNewCandidate, openKnowledgeEditor, deleteKnowledgeItem, updateOfferProfile }) {
   const candidate = db.candidates.find((item) => item.id === ui.callCandidateId);
   const available = db.candidates.filter((item) => item.status !== "active" && item.status !== "lost");
 
@@ -1375,6 +1543,8 @@ function CallsView({ db, ui, setUi, saveCandidate, createFollowup, notify, openN
       <KnowledgeBaseView
         knowledge={db.knowledge}
         candidates={available}
+        offer={db.settings.offerProfile}
+        updateOfferProfile={updateOfferProfile}
         startCall={(candidateId) => setUi((current) => ({ ...current, callCandidateId: candidateId }))}
         openNewCandidate={openNewCandidate}
         openEditor={openKnowledgeEditor}
@@ -1387,6 +1557,7 @@ function CallsView({ db, ui, setUi, saveCandidate, createFollowup, notify, openN
   const lang = candidate.call.language || "ru";
   const historyLen = candidate.call.history.length;
   const pct = Math.min(100, Math.round((historyLen / 16) * 100));
+  const scriptRecommendations = getScriptRecommendations(candidate, step, db.knowledge, db.settings.offerProfile);
 
   async function persist(nextCandidate, activity = "Звонок обновлён") {
     try {
@@ -1474,6 +1645,7 @@ function CallsView({ db, ui, setUi, saveCandidate, createFollowup, notify, openN
       </div>
       <div className="grid live-summary">
         <div className="card card-pad"><div className="info-title">Кандидат</div><Person candidate={candidate} /><div className="mt-small"><StatusBadge status={candidate.status} /></div></div>
+        <ScriptRecommendations items={scriptRecommendations} />
         <div className="card card-pad"><div className="info-title">Live summary</div><LiveSummary candidate={candidate} /></div>
         <div className="card card-pad"><div className="info-title">Заметки во время звонка</div><textarea value={candidate.call.answers.liveNotes || ""} onChange={(event) => persist({ ...candidate, call: { ...candidate.call, answers: { ...candidate.call.answers, liveNotes: event.target.value } } }, "Live notes обновлены")} placeholder="Свободные комментарии..." /></div>
       </div>

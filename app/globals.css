@@ -230,6 +230,16 @@ small { color: var(--muted); }
 .call-start-row:hover { background: #fffdf2; border-color: #f3dc64; }
 .knowledge-tip { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .knowledge-textarea { min-height: 240px; }
+.offer-builder .section-header { align-items: flex-start; }
+.offer-grid { display: grid; gap: 10px; max-height: 520px; overflow: auto; padding-right: 3px; }
+.offer-grid label { gap: 6px; }
+.offer-grid textarea { min-height: 76px; font-size: 12px; line-height: 1.45; }
+.recommendation-card { border-color: #f0dd7a; background: #fffef7; }
+.recommendation-list { display: grid; gap: 10px; }
+.recommendation-item { border: 1px solid #efe4a3; border-radius: 12px; padding: 11px; background: white; }
+.recommendation-item span { display: block; color: #927400; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; }
+.recommendation-item strong { display: block; margin-top: 5px; font-size: 13px; }
+.recommendation-item p { margin: 6px 0 0; color: #3f4248; font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
 
 .settings-row { padding: 18px 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 360px); gap: 18px; align-items: center; }
 .settings-copy strong { display: block; }

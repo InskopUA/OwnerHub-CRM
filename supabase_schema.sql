@@ -99,6 +99,7 @@ create table if not exists public.app_settings (
   hub_name text not null default 'OwnerHub HRM',
   hr_name text not null default 'HR Manager',
   default_script_language text not null default 'ru',
+  offer_profile jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -280,6 +281,7 @@ create table if not exists public.activities (
 );
 
 alter table public.app_settings add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
+alter table public.app_settings add column if not exists offer_profile jsonb not null default '{}'::jsonb;
 alter table public.workspace_webhook_tokens add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.candidates add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.candidate_equipment add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
