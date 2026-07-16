@@ -243,6 +243,19 @@ create table if not exists public.call_sessions (
   completed_at timestamptz
 );
 
+create table if not exists public.call_knowledge_items (
+  id text primary key default ('kb_' || replace(gen_random_uuid()::text, '-', '')),
+  workspace_id uuid references public.workspaces(id) on delete cascade,
+  category text not null default 'Custom',
+  title text not null default '',
+  content text not null default '',
+  tags text[] not null default '{}',
+  sort_order integer not null default 100,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.followups (
   id text primary key default ('fu_' || replace(gen_random_uuid()::text, '-', '')),
   workspace_id uuid references public.workspaces(id) on delete cascade,
@@ -274,6 +287,7 @@ alter table public.candidate_documents add column if not exists workspace_id uui
 alter table public.candidate_insurance add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.candidate_call_state add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.call_sessions add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
+alter table public.call_knowledge_items add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.followups add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.activities add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 
@@ -297,6 +311,8 @@ create index if not exists idx_documents_workspace_id on public.candidate_docume
 create index if not exists idx_insurance_workspace_id on public.candidate_insurance(workspace_id);
 create index if not exists idx_call_state_workspace_id on public.candidate_call_state(workspace_id);
 create index if not exists idx_call_sessions_workspace_id on public.call_sessions(workspace_id);
+create index if not exists idx_call_knowledge_items_workspace_id on public.call_knowledge_items(workspace_id);
+create index if not exists idx_call_knowledge_items_category on public.call_knowledge_items(workspace_id, category, active);
 
 create or replace function public.create_candidate_defaults()
 returns trigger
@@ -388,6 +404,11 @@ create trigger set_updated_at_followups
 before update on public.followups
 for each row execute function public.set_updated_at();
 
+drop trigger if exists set_updated_at_call_knowledge_items on public.call_knowledge_items;
+create trigger set_updated_at_call_knowledge_items
+before update on public.call_knowledge_items
+for each row execute function public.set_updated_at();
+
 alter table public.workspaces enable row level security;
 alter table public.app_settings enable row level security;
 alter table public.workspace_webhook_tokens enable row level security;
@@ -397,6 +418,7 @@ alter table public.candidate_documents enable row level security;
 alter table public.candidate_insurance enable row level security;
 alter table public.candidate_call_state enable row level security;
 alter table public.call_sessions enable row level security;
+alter table public.call_knowledge_items enable row level security;
 alter table public.followups enable row level security;
 alter table public.activities enable row level security;
 
@@ -562,6 +584,25 @@ with check (
   exists (
     select 1 from public.workspaces w
     where w.id = call_sessions.workspace_id
+      and w.owner_user_id = auth.uid()
+  )
+);
+
+drop policy if exists "authenticated all call knowledge items" on public.call_knowledge_items;
+create policy "authenticated all call knowledge items"
+on public.call_knowledge_items for all
+to authenticated
+using (
+  exists (
+    select 1 from public.workspaces w
+    where w.id = call_knowledge_items.workspace_id
+      and w.owner_user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1 from public.workspaces w
+    where w.id = call_knowledge_items.workspace_id
       and w.owner_user_id = auth.uid()
   )
 );

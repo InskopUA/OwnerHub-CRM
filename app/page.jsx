@@ -19,6 +19,53 @@ const defaultSettings = {
   defaultScriptLanguage: "ru"
 };
 
+const knowledgeCategories = ["Opening", "Qualification", "Pay & Terms", "Insurance", "Documents", "Objections", "Process", "Custom"];
+
+const defaultKnowledgeItems = [
+  {
+    category: "Opening",
+    title: "Первое касание",
+    content: "Здравствуйте! Меня зовут [HR NAME], я представляю [COMPANY]. Мы подключаем Owner-Operators с открытыми трейлерами на две машины. Вам сейчас удобно разговаривать?",
+    tags: ["intro", "cold call"]
+  },
+  {
+    category: "Qualification",
+    title: "Базовая квалификация",
+    content: "Уточнить: город/штат/ZIP, Local или OTR, есть ли свой truck и open 2-car trailer, CDL, общий опыт, опыт car hauling, аварии/violations, когда готов начать.",
+    tags: ["checklist", "screening"]
+  },
+  {
+    category: "Pay & Terms",
+    title: "Условия работы",
+    content: "Компания удерживает 10% от gross за dispatch. Выплаты каждую пятницу с задержкой в одну рабочую неделю. Local обычно $5,000-$7,000 gross, OTR обычно $6,000-$8,000 gross. Не обещать фиксированный gross.",
+    tags: ["money", "terms"]
+  },
+  {
+    category: "Insurance",
+    title: "Insurance quote",
+    content: "Ориентир insurance обычно $300-$400 в неделю, но точная цена зависит от driving record и quote страховой. Не обещать одобрение до проверки документов и driving record.",
+    tags: ["insurance", "quote"]
+  },
+  {
+    category: "Documents",
+    title: "Документы для старта",
+    content: "Для начала insurance quote нужны Driver License, truck registration и trailer registration. Позже понадобятся W-9, voided check, inspections, Owner Lease Agreement.",
+    tags: ["docs", "onboarding"]
+  },
+  {
+    category: "Objections",
+    title: "Возражение: хочу больше gross",
+    content: "Ответ: можем проверить OTR. Rate per mile ниже, чем Local, но больше miles и потенциально выше общий gross. Финальный вариант зависит от локации, техники и доступных lanes.",
+    tags: ["objection", "gross"]
+  },
+  {
+    category: "Process",
+    title: "Процесс онбординга",
+    content: "1. Квалификация кандидата. 2. Получаем документы. 3. Insurance quote. 4. Если approved и цена подходит - Owner Lease Agreement. 5. Logbook/signs. 6. Safety и dispatch onboarding. Обычно 5-7 дней.",
+    tags: ["onboarding", "process"]
+  }
+];
+
 const emptyTruck = () => ({
   make: "",
   model: "",
@@ -301,6 +348,33 @@ function mapActivity(row) {
   };
 }
 
+function mapKnowledgeItem(row) {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    category: row.category || "Custom",
+    title: row.title || "",
+    content: row.content || "",
+    tags: Array.isArray(row.tags) ? row.tags : [],
+    sortOrder: row.sort_order ?? 0,
+    active: row.active !== false,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function blankKnowledgeItem() {
+  return {
+    id: `kb_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+    category: "Custom",
+    title: "",
+    content: "",
+    tags: [],
+    sortOrder: 100,
+    active: true
+  };
+}
+
 function badgeClass(status) {
   if (["active", "insurance_approved", "ready_first_load"].includes(status)) return "badge-green";
   if (["lost", "insurance_rejected"].includes(status)) return "badge-red";
@@ -321,7 +395,7 @@ export default function RecruitingHub() {
   const [workspace, setWorkspace] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [db, setDb] = useState({ settings: defaultSettings, candidates: [], followups: [], activities: [] });
+  const [db, setDb] = useState({ settings: defaultSettings, candidates: [], followups: [], activities: [], knowledge: [] });
   const [ui, setUi] = useState({
     view: "dashboard",
     selectedCandidateId: null,
@@ -357,7 +431,7 @@ export default function RecruitingHub() {
     if (session) loadRemoteData();
     else {
       setWorkspace(null);
-      setDb({ settings: defaultSettings, candidates: [], followups: [], activities: [] });
+      setDb({ settings: defaultSettings, candidates: [], followups: [], activities: [], knowledge: [] });
     }
   }, [session]);
 
@@ -436,6 +510,35 @@ export default function RecruitingHub() {
         supabase.from("activities").select("*").eq("workspace_id", currentWorkspace.id).order("created_at", { ascending: false }).limit(500)
       ]);
 
+      let knowledgeRows = [];
+      const knowledgeResult = await supabase
+        .from("call_knowledge_items")
+        .select("*")
+        .eq("workspace_id", currentWorkspace.id)
+        .eq("active", true)
+        .order("sort_order", { ascending: true })
+        .order("updated_at", { ascending: false });
+
+      if (knowledgeResult.error && knowledgeResult.error.code !== "42P01") throw knowledgeResult.error;
+      if (!knowledgeResult.error) {
+        knowledgeRows = knowledgeResult.data || [];
+        if (!knowledgeRows.length) {
+          const seedRows = defaultKnowledgeItems.map((item, index) => ({
+            id: `kb_${Date.now().toString(36)}_${index}_${Math.random().toString(36).slice(2, 7)}`,
+            workspace_id: currentWorkspace.id,
+            category: item.category,
+            title: item.title,
+            content: item.content,
+            tags: item.tags,
+            sort_order: index,
+            active: true
+          }));
+          const seeded = await supabase.from("call_knowledge_items").insert(seedRows).select("*");
+          if (seeded.error) throw seeded.error;
+          knowledgeRows = seeded.data || [];
+        }
+      }
+
       const errors = [
         equipmentResult.error,
         docsResult.error,
@@ -466,7 +569,8 @@ export default function RecruitingHub() {
           )
         ),
         followups: (followupsResult.data || []).map(mapFollowup),
-        activities: (activitiesResult.data || []).map(mapActivity)
+        activities: (activitiesResult.data || []).map(mapActivity),
+        knowledge: knowledgeRows.map(mapKnowledgeItem)
       });
     } catch (error) {
       notify(error.message || "Не удалось загрузить данные Supabase");
@@ -693,6 +797,48 @@ export default function RecruitingHub() {
     }
   }
 
+  async function saveKnowledgeItem(item) {
+    if (!workspace?.id) throw new Error("Workspace не инициализирован");
+    const row = {
+      id: item.id,
+      workspace_id: workspace.id,
+      category: item.category || "Custom",
+      title: item.title || "Untitled",
+      content: item.content || "",
+      tags: Array.isArray(item.tags) ? item.tags : String(item.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean),
+      sort_order: Number(item.sortOrder) || 100,
+      active: item.active !== false
+    };
+    const { data, error } = await supabase.from("call_knowledge_items").upsert(row).select("*").single();
+    if (error) throw error;
+    const mapped = mapKnowledgeItem(data);
+    setDb((current) => {
+      const exists = current.knowledge.some((knowledgeItem) => knowledgeItem.id === mapped.id);
+      return {
+        ...current,
+        knowledge: exists
+          ? current.knowledge.map((knowledgeItem) => (knowledgeItem.id === mapped.id ? mapped : knowledgeItem))
+          : [mapped, ...current.knowledge]
+      };
+    });
+    notify("Материал базы знаний сохранён");
+  }
+
+  async function deleteKnowledgeItem(itemId) {
+    if (!workspace?.id) throw new Error("Workspace не инициализирован");
+    const { error } = await supabase
+      .from("call_knowledge_items")
+      .update({ active: false })
+      .eq("id", itemId)
+      .eq("workspace_id", workspace.id);
+    if (error) throw error;
+    setDb((current) => ({
+      ...current,
+      knowledge: current.knowledge.filter((item) => item.id !== itemId)
+    }));
+    notify("Материал удалён");
+  }
+
   async function updateSettings(settings) {
     if (!workspace?.id) {
       notify("Workspace ещё не инициализирован");
@@ -812,6 +958,8 @@ export default function RecruitingHub() {
               createFollowup={createFollowup}
               notify={notify}
               openNewCandidate={() => setModal({ type: "candidate", candidate: blankCandidate(), startCallAfter: true })}
+              openKnowledgeEditor={(item) => setModal({ type: "knowledge", item: item || blankKnowledgeItem() })}
+              deleteKnowledgeItem={deleteKnowledgeItem}
             />
           )}
           {ui.view === "pipeline" && (
@@ -876,6 +1024,20 @@ export default function RecruitingHub() {
           }}
         />
       )}
+      {modal?.type === "knowledge" && (
+        <KnowledgeModal
+          item={modal.item}
+          onClose={() => setModal(null)}
+          onSave={async (item) => {
+            try {
+              await saveKnowledgeItem(item);
+              setModal(null);
+            } catch (error) {
+              notify(error.message);
+            }
+          }}
+        />
+      )}
       {toast ? <div className="toast">{toast}</div> : null}
     </div>
   );
@@ -886,7 +1048,7 @@ function titleForView(view) {
   return {
     dashboard: ["Dashboard", ""],
     candidates: ["Кандидаты", "Единая база лидов и водителей"],
-    calls: ["Скрипт звонка", "Интерактивный помощник HR"],
+    calls: ["Скрипт звонка", "База знаний и интерактивный помощник HR"],
     pipeline: ["Воронка онбординга", "Перемещайте кандидатов между этапами"],
     followups: ["Follow-ups", "План контактов и напоминаний"],
     settings: ["Настройки", "Supabase, Vercel и параметры системы"]
@@ -1130,16 +1292,94 @@ function InfoSection({ title, items }) {
   return <div className="info-section"><div className="info-title">{title}</div><div className="info-grid">{items.map(([label, value]) => <div className="info-item" key={label}><span>{label}</span><strong>{valueOrDash(value)}</strong></div>)}</div></div>;
 }
 
-function CallsView({ db, ui, setUi, saveCandidate, createFollowup, notify, openNewCandidate }) {
+function KnowledgeBaseView({ knowledge, candidates, startCall, openNewCandidate, openEditor, deleteItem }) {
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("");
+  const cleanQuery = query.trim().toLowerCase();
+  const visibleItems = knowledge
+    .filter((item) => !category || item.category === category)
+    .filter((item) => {
+      const haystack = [item.title, item.category, item.content, ...(item.tags || [])].join(" ").toLowerCase();
+      return !cleanQuery || haystack.includes(cleanQuery);
+    })
+    .sort((a, b) => (a.sortOrder - b.sortOrder) || String(b.updatedAt).localeCompare(String(a.updatedAt)));
+
+  return (
+    <div className="knowledge-layout">
+      <div className="card card-pad knowledge-main">
+        <SectionTitle
+          title="База знаний для звонков"
+          note="Скрипты, условия, ответы на возражения и процесс онбординга. Можно редактировать под компанию."
+          action={<button className="btn btn-primary" onClick={() => openEditor()}>＋ Материал</button>}
+        />
+        <div className="toolbar">
+          <div className="searchbox"><span>⌕</span><input placeholder="Поиск по скриптам, terms, objections..." value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+          <select value={category} onChange={(event) => setCategory(event.target.value)}>
+            <option value="">Все категории</option>
+            {knowledgeCategories.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </div>
+        {visibleItems.length ? (
+          <div className="knowledge-grid">
+            {visibleItems.map((item) => (
+              <article className="knowledge-card" key={item.id}>
+                <div className="knowledge-card-head">
+                  <span className="badge badge-yellow">{item.category}</span>
+                  <div className="knowledge-card-actions">
+                    <button className="btn btn-small" onClick={() => openEditor(item)}>✎</button>
+                    <button className="btn btn-small btn-danger" onClick={() => window.confirm("Удалить материал?") && deleteItem(item.id)}>×</button>
+                  </div>
+                </div>
+                <h3>{item.title}</h3>
+                <p>{item.content}</p>
+                {item.tags?.length ? <div className="knowledge-tags">{item.tags.map((tag) => <span key={tag}>{tag}</span>)}</div> : null}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <Empty title="Материалов не найдено" note="Измените поиск или добавьте первый материал базы знаний." />
+        )}
+      </div>
+
+      <aside className="grid side-grid">
+        <div className="card card-pad">
+          <SectionTitle title="Начать звонок" action={<button className="btn btn-small btn-primary" onClick={openNewCandidate}>＋ Lead</button>} />
+          {candidates.length ? (
+            <div className="call-start-list">
+              {candidates.slice(0, 8).map((candidate) => (
+                <button className="call-start-row" key={candidate.id} onClick={() => startCall(candidate.id)}>
+                  <Person candidate={candidate} />
+                  <StatusBadge status={candidate.status} />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="section-note padded">Нет кандидатов для звонка.</div>
+          )}
+        </div>
+        <div className="card card-pad">
+          <div className="info-title">Как использовать</div>
+          <div className="knowledge-tip">Держите здесь живую базу ответов: rates, insurance, документы, objection handling, follow-up wording. HR может быстро найти ответ во время звонка и обновить материал после новых кейсов.</div>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function CallsView({ db, ui, setUi, saveCandidate, createFollowup, notify, openNewCandidate, openKnowledgeEditor, deleteKnowledgeItem }) {
   const candidate = db.candidates.find((item) => item.id === ui.callCandidateId);
   const available = db.candidates.filter((item) => item.status !== "active" && item.status !== "lost");
 
   if (!candidate) {
     return (
-      <div className="card call-selector">
-        <SectionTitle title="Выберите кандидата для звонка" note="Или создайте нового лида перед началом разговора" action={<button className="btn btn-primary" onClick={openNewCandidate}>＋ Новый кандидат</button>} />
-        {available.length ? <div className="candidate-choice-grid">{available.map((item) => <button className="candidate-choice" key={item.id} onClick={() => setUi((current) => ({ ...current, callCandidateId: item.id }))}><Person candidate={item} /><div className="mt-small"><StatusBadge status={item.status} /></div></button>)}</div> : <Empty title="Нет кандидатов для звонка" note="Создайте нового кандидата и начните квалификацию." />}
-      </div>
+      <KnowledgeBaseView
+        knowledge={db.knowledge}
+        candidates={available}
+        startCall={(candidateId) => setUi((current) => ({ ...current, callCandidateId: candidateId }))}
+        openNewCandidate={openNewCandidate}
+        openEditor={openKnowledgeEditor}
+        deleteItem={deleteKnowledgeItem}
+      />
     );
   }
 
@@ -1694,6 +1934,38 @@ function FollowupModal({ candidates, defaultCandidateId, onClose, onSave }) {
           </div>
         </div>
         <div className="modal-foot"><button className="btn" onClick={onClose}>Отмена</button><button className="btn btn-primary" onClick={() => candidateId && onSave({ candidateId, date, time, type, note })}>Добавить</button></div>
+      </div>
+    </div>
+  );
+}
+
+function KnowledgeModal({ item, onClose, onSave }) {
+  const [draft, setDraft] = useState({
+    ...item,
+    tagsText: (item.tags || []).join(", ")
+  });
+  const update = (key, value) => setDraft((current) => ({ ...current, [key]: value }));
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal wide">
+        <div className="modal-head"><strong>{item.title ? "Редактировать материал" : "Новый материал базы знаний"}</strong><button className="btn icon-btn" onClick={onClose}>×</button></div>
+        <div className="modal-body">
+          <div className="field-grid">
+            <label>Название<input value={draft.title} onChange={(event) => update("title", event.target.value)} placeholder="Например: Возражение по insurance" /></label>
+            <label>Категория<select value={draft.category} onChange={(event) => update("category", event.target.value)}>{knowledgeCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
+            <label>Порядок<input type="number" value={draft.sortOrder} onChange={(event) => update("sortOrder", event.target.value)} /></label>
+            <label>Tags<input value={draft.tagsText} onChange={(event) => update("tagsText", event.target.value)} placeholder="insurance, objection, docs" /></label>
+            <label className="field-span">Содержание<textarea className="knowledge-textarea" value={draft.content} onChange={(event) => update("content", event.target.value)} placeholder="Текст, который HR может использовать во время звонка..." /></label>
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn" onClick={onClose}>Отмена</button>
+          <button className="btn btn-primary" onClick={() => onSave({
+            ...draft,
+            tags: draft.tagsText.split(",").map((tag) => tag.trim()).filter(Boolean)
+          })}>Сохранить</button>
+        </div>
       </div>
     </div>
   );

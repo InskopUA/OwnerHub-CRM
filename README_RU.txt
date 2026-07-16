@@ -7,6 +7,7 @@ OWNERHUB HRM - NEXT.JS + SUPABASE
 - Supabase Auth login/signup;
 - workspace model: один аккаунт = одна отдельная компания/система с изолированными данными;
 - хранение кандидатов, follow-ups, документов, insurance, call state и активности в Supabase;
+- редактируемая база знаний для скрипта звонка в каждом workspace;
 - SQL-схема в файле supabase_schema.sql;
 - Vercel env-переменные через .env.example.
 
@@ -81,6 +82,12 @@ Webhook делает dedupe по phone или email внутри workspace: ес
 Каждый token привязан к конкретному workspace, поэтому разные пользователи могут самостоятельно подключить свои Facebook/Instagram лиды.
 Если форм несколько, создайте отдельный Make scenario на каждую Facebook Lead Form. URL и token можно использовать те же для одного workspace.
 Webhook умеет smart mapping: он читает field_data, разные названия полей вроде full_name, phone_number, city, truck_make и русские названия распознаются автоматически. Нераспознанные ответы сохраняются в notes кандидата.
+
+Call knowledge base:
+- вкладка "Скрипт звонка" содержит базу знаний для HR: opening, qualification, terms, insurance, documents, objections и process;
+- материалы можно добавлять, редактировать, удалять и искать;
+- данные хранятся в таблице call_knowledge_items и изолированы по workspace;
+- после обновления проекта обязательно прогоните актуальный supabase_schema.sql, чтобы создать новую таблицу и RLS policies.
 
 Важно:
 - SUPABASE_SERVICE_ROLE_KEY нельзя добавлять во frontend и нельзя делать NEXT_PUBLIC.
