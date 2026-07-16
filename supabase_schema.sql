@@ -103,6 +103,18 @@ create table if not exists public.app_settings (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.workspace_webhook_tokens (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  name text not null default 'Make',
+  token_hash text not null unique,
+  token_preview text not null default '',
+  active boolean not null default true,
+  last_used_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.candidates (
   id text primary key default ('cand_' || replace(gen_random_uuid()::text, '-', '')),
   workspace_id uuid references public.workspaces(id) on delete cascade,
@@ -255,6 +267,7 @@ create table if not exists public.activities (
 );
 
 alter table public.app_settings add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
+alter table public.workspace_webhook_tokens add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.candidates add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.candidate_equipment add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.candidate_documents add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
@@ -265,6 +278,8 @@ alter table public.followups add column if not exists workspace_id uuid referenc
 alter table public.activities add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 
 create unique index if not exists idx_app_settings_workspace_id_unique on public.app_settings(workspace_id);
+create index if not exists idx_workspace_webhook_tokens_workspace_id on public.workspace_webhook_tokens(workspace_id);
+create index if not exists idx_workspace_webhook_tokens_token_hash on public.workspace_webhook_tokens(token_hash);
 create index if not exists idx_candidates_workspace_id on public.candidates(workspace_id);
 create index if not exists idx_candidates_status on public.candidates(status);
 create index if not exists idx_candidates_state on public.candidates(state);
@@ -333,6 +348,11 @@ create trigger set_updated_at_app_settings
 before update on public.app_settings
 for each row execute function public.set_updated_at();
 
+drop trigger if exists set_updated_at_workspace_webhook_tokens on public.workspace_webhook_tokens;
+create trigger set_updated_at_workspace_webhook_tokens
+before update on public.workspace_webhook_tokens
+for each row execute function public.set_updated_at();
+
 drop trigger if exists set_updated_at_candidates on public.candidates;
 create trigger set_updated_at_candidates
 before update on public.candidates
@@ -370,6 +390,7 @@ for each row execute function public.set_updated_at();
 
 alter table public.workspaces enable row level security;
 alter table public.app_settings enable row level security;
+alter table public.workspace_webhook_tokens enable row level security;
 alter table public.candidates enable row level security;
 alter table public.candidate_equipment enable row level security;
 alter table public.candidate_documents enable row level security;
@@ -404,6 +425,25 @@ with check (
   exists (
     select 1 from public.workspaces w
     where w.id = app_settings.workspace_id
+      and w.owner_user_id = auth.uid()
+  )
+);
+
+drop policy if exists "authenticated all workspace webhook tokens" on public.workspace_webhook_tokens;
+create policy "authenticated all workspace webhook tokens"
+on public.workspace_webhook_tokens for all
+to authenticated
+using (
+  exists (
+    select 1 from public.workspaces w
+    where w.id = workspace_webhook_tokens.workspace_id
+      and w.owner_user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1 from public.workspaces w
+    where w.id = workspace_webhook_tokens.workspace_id
       and w.owner_user_id = auth.uid()
   )
 );

@@ -36,19 +36,19 @@ Vercel:
    NEXT_PUBLIC_SUPABASE_URL
    NEXT_PUBLIC_SUPABASE_ANON_KEY
    SUPABASE_SERVICE_ROLE_KEY
-   OWNERHUB_MAKE_WEBHOOK_SECRET
 3. Deploy.
 
 Make.com lead webhook:
 1. В Vercel добавьте SUPABASE_SERVICE_ROLE_KEY. Это серверный ключ, он используется только в API route.
-2. В Vercel добавьте OWNERHUB_MAKE_WEBHOOK_SECRET. Придумайте длинный секрет, например 32+ символа.
-3. Если в Supabase будет больше одного workspace, добавьте OWNERHUB_MAKE_WORKSPACE_ID.
-4. В Make создайте HTTP -> Make a request:
+2. Пользователь входит в OwnerHub HRM и открывает Settings -> Make Integration.
+3. Нажимает Generate token.
+4. Копирует Webhook URL и token из инструкции.
+5. В Make создаёт HTTP -> Make a request:
    Method: POST
    URL: https://your-vercel-domain.vercel.app/api/make/leads
    Headers:
      Content-Type: application/json
-     x-ownerhub-secret: значение OWNERHUB_MAKE_WEBHOOK_SECRET
+     x-ownerhub-token: personal token from Settings
    Body type: Raw JSON
 
 Пример JSON для Make:
@@ -68,6 +68,7 @@ Make.com lead webhook:
 }
 
 Webhook делает dedupe по phone или email внутри workspace: если кандидат уже есть, он обновится, если нет - создастся новый.
+Каждый token привязан к конкретному workspace, поэтому разные пользователи могут самостоятельно подключить свои Facebook/Instagram лиды.
 
 Важно:
 - SUPABASE_SERVICE_ROLE_KEY нельзя добавлять во frontend и нельзя делать NEXT_PUBLIC.

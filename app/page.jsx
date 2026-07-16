@@ -808,7 +808,7 @@ export default function RecruitingHub() {
               addFollowup={() => setModal({ type: "followup" })}
             />
           )}
-          {ui.view === "settings" && <SettingsView db={db} updateSettings={updateSettings} reload={loadRemoteData} />}
+          {ui.view === "settings" && <SettingsView db={db} workspace={workspace} updateSettings={updateSettings} reload={loadRemoteData} />}
         </section>
       </main>
       {modal?.type === "candidate" && (
@@ -1266,15 +1266,141 @@ function FollowColumn({ title, list, db, openCandidate, completeFollowup, snooze
   return <div className="card card-pad"><SectionTitle title={title} action={<span className={`badge ${badge}`}>{list.length}</span>} />{list.length ? <div className="follow-list">{list.map((followup) => <FollowItem key={followup.id} followup={followup} candidate={db.candidates.find((candidate) => candidate.id === followup.candidateId)} openCandidate={openCandidate} completeFollowup={completeFollowup} snoozeFollowup={snoozeFollowup} />)}</div> : <div className="section-note padded">Нет задач</div>}</div>;
 }
 
-function SettingsView({ db, updateSettings, reload }) {
+function SettingsView({ db, workspace, updateSettings, reload }) {
   const [settings, setSettings] = useState(db.settings);
+  const [tokens, setTokens] = useState([]);
+  const [generatedToken, setGeneratedToken] = useState("");
+  const [showGuide, setShowGuide] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const webhookUrl = typeof window === "undefined" ? "/api/make/leads" : `${window.location.origin}/api/make/leads`;
+
+  useEffect(() => {
+    if (!workspace?.id) return;
+    loadTokens();
+  }, [workspace?.id]);
+
+  async function hashToken(token) {
+    const data = new TextEncoder().encode(token);
+    const digest = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+
+  async function loadTokens() {
+    const { data, error } = await supabase
+      .from("workspace_webhook_tokens")
+      .select("id, name, token_preview, active, created_at, last_used_at")
+      .eq("workspace_id", workspace.id)
+      .order("created_at", { ascending: false });
+
+    if (!error) setTokens(data || []);
+  }
+
+  async function generateToken() {
+    if (!workspace?.id) return;
+    setBusy(true);
+    try {
+      const raw = new Uint8Array(32);
+      crypto.getRandomValues(raw);
+      const token = `ohwh_${Array.from(raw).map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+      const tokenHash = await hashToken(token);
+      const preview = `${token.slice(0, 10)}...${token.slice(-6)}`;
+      const { error } = await supabase.from("workspace_webhook_tokens").insert({
+        workspace_id: workspace.id,
+        name: "Make",
+        token_hash: tokenHash,
+        token_preview: preview,
+        active: true
+      });
+      if (error) throw error;
+      setGeneratedToken(token);
+      await loadTokens();
+      setShowGuide(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revokeToken(id) {
+    const { error } = await supabase
+      .from("workspace_webhook_tokens")
+      .update({ active: false })
+      .eq("id", id)
+      .eq("workspace_id", workspace.id);
+    if (!error) await loadTokens();
+  }
+
   return (
-    <div className="card card-pad settings">
-      <SectionTitle title="Настройки" note="Параметры хаба и Supabase-синхронизации" />
-      <div className="settings-row"><div className="settings-copy"><strong>Компания</strong><p>Используется в скрипте звонка.</p></div><input value={settings.companyName} onChange={(event) => setSettings({ ...settings, companyName: event.target.value })} /></div>
-      <div className="settings-row"><div className="settings-copy"><strong>HR name</strong><p>Подставляется в начало звонка.</p></div><input value={settings.hrName} onChange={(event) => setSettings({ ...settings, hrName: event.target.value })} /></div>
-      <div className="settings-row"><div className="settings-copy"><strong>Синхронизация</strong><p>Перезагрузить данные из Supabase.</p></div><button className="btn" onClick={reload}>Обновить данные</button></div>
-      <div className="settings-row"><div className="settings-copy"><strong>Сохранить</strong><p>Записать настройки в таблицу app_settings.</p></div><button className="btn btn-primary" onClick={() => updateSettings(settings)}>Сохранить</button></div>
+    <>
+      <div className="card card-pad settings">
+        <SectionTitle title="Настройки" />
+        <div className="settings-row"><div className="settings-copy"><strong>Компания</strong><p>Используется в скрипте звонка.</p></div><input value={settings.companyName} onChange={(event) => setSettings({ ...settings, companyName: event.target.value })} /></div>
+        <div className="settings-row"><div className="settings-copy"><strong>HR name</strong><p>Подставляется в начало звонка.</p></div><input value={settings.hrName} onChange={(event) => setSettings({ ...settings, hrName: event.target.value })} /></div>
+        <div className="settings-row"><div className="settings-copy"><strong>Синхронизация</strong><p>Перезагрузить данные.</p></div><button className="btn" onClick={reload}>Обновить данные</button></div>
+        <div className="settings-row"><div className="settings-copy"><strong>Сохранить</strong><p>Записать настройки.</p></div><button className="btn btn-primary" onClick={() => updateSettings(settings)}>Сохранить</button></div>
+      </div>
+
+      <div className="card card-pad settings mt">
+        <SectionTitle title="Make Integration" action={<button className="btn btn-small" onClick={() => setShowGuide(true)}>Инструкция</button>} />
+        <div className="settings-row">
+          <div className="settings-copy"><strong>Webhook URL</strong><p>Этот URL вставляется в HTTP module в Make.</p></div>
+          <input readOnly value={webhookUrl} onFocus={(event) => event.target.select()} />
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><strong>Personal token</strong><p>Каждый токен привязан только к этому workspace. Лиды попадут только в эту систему.</p></div>
+          <button className="btn btn-primary" disabled={busy || !workspace?.id} onClick={generateToken}>{busy ? "Создаём..." : "Generate token"}</button>
+        </div>
+        {generatedToken ? (
+          <div className="settings-row">
+            <div className="settings-copy"><strong>Новый token</strong><p>Скопируй сейчас. После закрытия он будет скрыт, в базе хранится только hash.</p></div>
+            <textarea readOnly value={generatedToken} onFocus={(event) => event.target.select()} />
+          </div>
+        ) : null}
+        <div className="settings-row">
+          <div className="settings-copy"><strong>Active tokens</strong><p>Можно отключить старый токен и создать новый.</p></div>
+          <div className="token-list">
+            {tokens.length ? tokens.map((token) => (
+              <div className="token-row" key={token.id}>
+                <div><strong>{token.name}</strong><span>{token.token_preview} · {token.active ? "active" : "disabled"}</span></div>
+                {token.active ? <button className="btn btn-small btn-danger" onClick={() => revokeToken(token.id)}>Disable</button> : null}
+              </div>
+            )) : <div className="section-note">Токены ещё не созданы.</div>}
+          </div>
+        </div>
+      </div>
+
+      {showGuide ? <MakeGuideModal webhookUrl={webhookUrl} token={generatedToken} onClose={() => setShowGuide(false)} /> : null}
+    </>
+  );
+}
+
+function MakeGuideModal({ webhookUrl, token, onClose }) {
+  return (
+    <div className="modal-backdrop">
+      <div className="modal wide">
+        <div className="modal-head"><strong>Make setup guide</strong><button className="btn icon-btn" onClick={onClose}>×</button></div>
+        <div className="modal-body guide">
+          <div className="guide-step"><b>1. Meta Lead Form</b><p>В Meta Ads создай Instant Form для Facebook / Instagram. Instagram account должен быть professional и привязан к Facebook Page.</p></div>
+          <div className="guide-step"><b>2. Make trigger</b><p>В Make создай Scenario и добавь Facebook Lead Ads trigger: New Lead / Watch Leads. Подключи Facebook account, выбери Page и Lead Form.</p></div>
+          <div className="guide-step"><b>3. Get Lead Details</b><p>Добавь Facebook Lead Ads → Get Lead Details и передай туда Lead ID из первого модуля.</p></div>
+          <div className="guide-step"><b>4. HTTP request</b><p>Добавь HTTP → Make a request.</p><pre>{`Method: POST\nURL: ${webhookUrl}\nHeaders:\nContent-Type: application/json\nx-ownerhub-token: ${token || "YOUR_GENERATED_TOKEN"}`}</pre></div>
+          <div className="guide-step"><b>5. JSON body</b><p>В Body type выбери Raw / JSON и замапь поля из Get Lead Details.</p><pre>{`{
+  "name": "{{Full Name}}",
+  "phone": "{{Phone Number}}",
+  "email": "{{Email}}",
+  "source": "Facebook Lead Form",
+  "city": "{{City}}",
+  "state": "{{State}}",
+  "zip": "{{ZIP}}",
+  "workPreference": "{{Work Preference}}",
+  "truckMake": "{{Truck Make}}",
+  "truckModel": "{{Truck Model}}",
+  "trailerMake": "{{Trailer Make}}",
+  "notes": "Imported from Make"
+}`}</pre></div>
+          <div className="guide-step"><b>6. Test</b><p>Нажми Run once в Make и отправь тестовый лид. Успешный ответ будет ok: true. Новый кандидат появится в Candidates.</p></div>
+        </div>
+        <div className="modal-foot"><button className="btn btn-primary" onClick={onClose}>Готово</button></div>
+      </div>
     </div>
   );
 }

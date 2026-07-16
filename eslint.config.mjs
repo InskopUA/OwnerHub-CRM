@@ -17,12 +17,14 @@ export default [
       },
       globals: {
         console: "readonly",
+        crypto: "readonly",
         document: "readonly",
         event: "readonly",
         FormData: "readonly",
         process: "readonly",
         setTimeout: "readonly",
         structuredClone: "readonly",
+        TextEncoder: "readonly",
         URL: "readonly",
         window: "readonly"
       }

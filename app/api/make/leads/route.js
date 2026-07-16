@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { hasSupabaseAdminEnv, supabaseAdmin } from "../../../../lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
@@ -36,12 +37,17 @@ const splitName = (body) => {
   };
 };
 
-const getSecret = (request, body) =>
+const getToken = (request, body) =>
+  request.headers.get("x-ownerhub-token") ||
   request.headers.get("x-ownerhub-secret") ||
   request.headers.get("x-make-secret") ||
+  new URL(request.url).searchParams.get("token") ||
   new URL(request.url).searchParams.get("secret") ||
+  body?.token ||
   body?.secret ||
   "";
+
+const hashToken = (token) => createHash("sha256").update(token).digest("hex");
 
 const validStatuses = new Set([
   "new",
@@ -66,7 +72,32 @@ const validStatuses = new Set([
   "lost"
 ]);
 
-async function resolveWorkspace(body, request) {
+async function resolveWorkspace(body, request, token) {
+  const expectedSecret = process.env.OWNERHUB_MAKE_WEBHOOK_SECRET;
+  if (token && expectedSecret && token === expectedSecret) return resolveLegacyWorkspace(body, request);
+
+  if (!token) throw new Error("Missing webhook token");
+
+  const tokenHash = hashToken(token);
+  const { data, error } = await supabaseAdmin
+    .from("workspace_webhook_tokens")
+    .select("id, workspace_id, active")
+    .eq("token_hash", tokenHash)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data?.workspace_id) throw new Error("Invalid webhook token");
+
+  await supabaseAdmin
+    .from("workspace_webhook_tokens")
+    .update({ last_used_at: new Date().toISOString() })
+    .eq("id", data.id);
+
+  return data.workspace_id;
+}
+
+async function resolveLegacyWorkspace(body, request) {
   const url = new URL(request.url);
   const explicitWorkspaceId =
     pick(body, ["workspaceId", "workspace_id"]) ||
@@ -242,16 +273,8 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const expectedSecret = process.env.OWNERHUB_MAKE_WEBHOOK_SECRET;
-    if (!expectedSecret) {
-      return NextResponse.json({ ok: false, error: "Missing OWNERHUB_MAKE_WEBHOOK_SECRET" }, { status: 500 });
-    }
-
-    if (getSecret(request, body) !== expectedSecret) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
-
-    const workspaceId = await resolveWorkspace(body, request);
+    const token = getToken(request, body);
+    const workspaceId = await resolveWorkspace(body, request, token);
     const lead = mapLead(body, workspaceId);
     const existingCandidateId = await findExistingCandidate(workspaceId, lead);
 
