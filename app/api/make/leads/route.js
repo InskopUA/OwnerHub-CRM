@@ -22,6 +22,84 @@ const toNumberOrNull = (value) => {
   return Number.isFinite(number) ? number : null;
 };
 
+const canonicalFieldNames = {
+  fullname: "name",
+  name: "name",
+  firstname: "firstName",
+  lastname: "lastName",
+  phonenumber: "phone",
+  phone: "phone",
+  mobile: "phone",
+  email: "email",
+  emailaddress: "email",
+  city: "city",
+  state: "state",
+  zipcode: "zip",
+  postalcode: "zip",
+  zip: "zip",
+  workpreference: "workPreference",
+  worktype: "workPreference",
+  truckmake: "truckMake",
+  truckmodel: "truckModel",
+  truckyear: "truckYear",
+  trailermake: "trailerMake",
+  trailermodel: "trailerModel",
+  traileryear: "trailerYear",
+  notes: "notes",
+  message: "notes",
+  comments: "notes"
+};
+
+const normalizeFieldName = (name) => String(name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const valueToString = (value) => {
+  if (value === undefined || value === null) return "";
+  if (Array.isArray(value)) return value.map(valueToString).filter(Boolean).join(", ");
+  if (typeof value === "object") {
+    if ("value" in value) return valueToString(value.value);
+    if ("values" in value) return valueToString(value.values);
+    return "";
+  }
+  return String(value).trim();
+};
+
+const assignLeadField = (target, rawName, value) => {
+  const key = canonicalFieldNames[normalizeFieldName(rawName)];
+  const cleanValue = valueToString(value);
+  if (key && cleanValue && !target[key]) target[key] = cleanValue;
+};
+
+const mergeNamedFieldArray = (target, fields) => {
+  if (!Array.isArray(fields)) return;
+
+  fields.forEach((field) => {
+    const rawName = field?.name || field?.key || field?.label || field?.field_name;
+    const value = field?.values ?? field?.value ?? field?.answer ?? field?.answers;
+    assignLeadField(target, rawName, value);
+  });
+};
+
+const normalizeLeadPayload = (body) => {
+  const normalized = {};
+
+  [
+    body?.field_data,
+    body?.fieldData,
+    body?.custom_fields,
+    body?.customFields,
+    body?.data?.field_data,
+    body?.lead?.field_data,
+    body?.response?.field_data
+  ].forEach((fields) => mergeNamedFieldArray(normalized, fields));
+
+  Object.entries(body || {}).forEach(([key, value]) => {
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) return;
+    assignLeadField(normalized, key, value);
+  });
+
+  return { ...body, ...normalized };
+};
+
 const splitName = (body) => {
   const firstName = pick(body, ["firstName", "first_name", "first"]);
   const lastName = pick(body, ["lastName", "last_name", "last"]);
@@ -272,7 +350,8 @@ export async function POST(request) {
       );
     }
 
-    const body = await request.json();
+    const rawBody = await request.json();
+    const body = normalizeLeadPayload(rawBody);
     const token = getToken(request, body);
     const workspaceId = await resolveWorkspace(body, request, token);
     const lead = mapLead(body, workspaceId);
