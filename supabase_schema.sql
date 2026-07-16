@@ -1,4 +1,4 @@
--- Sofia Recruiting Hub - Supabase schema
+-- OwnerHub HRM - Supabase schema
 -- Paste this whole file into Supabase Dashboard -> SQL Editor -> Run.
 
 create extension if not exists pgcrypto;
@@ -86,7 +86,7 @@ $$;
 create table if not exists public.app_settings (
   id text primary key default 'default',
   company_name text not null default 'Sofia Logistics LLC',
-  hub_name text not null default 'Sofia Recruiting Hub',
+  hub_name text not null default 'OwnerHub HRM',
   hr_name text not null default 'HR Manager',
   default_script_language text not null default 'ru',
   created_at timestamptz not null default now(),
@@ -323,7 +323,7 @@ before update on public.followups
 for each row execute function public.set_updated_at();
 
 insert into public.app_settings (id, company_name, hub_name, hr_name, default_script_language)
-values ('default', 'Sofia Logistics LLC', 'Sofia Recruiting Hub', 'HR Manager', 'ru')
+values ('default', 'Sofia Logistics LLC', 'OwnerHub HRM', 'HR Manager', 'ru')
 on conflict (id) do nothing;
 
 alter table public.app_settings enable row level security;

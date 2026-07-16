@@ -1,7 +1,7 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Sofia Recruiting Hub",
+  title: "OwnerHub HRM",
   description: "Recruiting CRM for Owner-Operator onboarding"
 };
 

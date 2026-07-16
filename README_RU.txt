@@ -1,4 +1,4 @@
-SOFIA RECRUITING HUB - NEXT.JS + SUPABASE
+OWNERHUB HRM - NEXT.JS + SUPABASE
 
 Проект переведен со статического index.html на Next.js, чтобы нормально деплоиться на Vercel и работать с Supabase.
 

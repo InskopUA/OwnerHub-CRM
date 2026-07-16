@@ -14,7 +14,7 @@ import {
 
 const defaultSettings = {
   companyName: "Sofia Logistics LLC",
-  hubName: "Sofia Recruiting Hub",
+  hubName: "OwnerHub HRM",
   hrName: "HR Manager",
   defaultScriptLanguage: "ru"
 };
@@ -632,7 +632,7 @@ export default function RecruitingHub() {
         <div className="brand">
           <div className="brand-mark">S</div>
           <div className="brand-copy">
-            <strong>Sofia Recruiting Hub</strong>
+            <strong>OwnerHub HRM</strong>
             <span>Supabase CRM</span>
           </div>
         </div>
@@ -787,7 +787,7 @@ function titleForView(view) {
     pipeline: ["Воронка онбординга", "Перемещайте кандидатов между этапами"],
     followups: ["Follow-ups", "План контактов и напоминаний"],
     settings: ["Настройки", "Supabase, Vercel и параметры системы"]
-  }[view] || ["Sofia Recruiting Hub", ""];
+  }[view] || ["OwnerHub HRM", ""];
 }
 
 function SetupScreen() {
@@ -830,7 +830,7 @@ function AuthScreen() {
     <div className="auth-page">
       <form className="auth-card" onSubmit={submit}>
         <div className="brand-mark">S</div>
-        <h1>Sofia Recruiting Hub</h1>
+        <h1>OwnerHub HRM</h1>
         <p>Войдите в Supabase аккаунт, чтобы открыть базу кандидатов.</p>
         <label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
         <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={6} /></label>
