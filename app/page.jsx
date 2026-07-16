@@ -708,10 +708,8 @@ export default function RecruitingHub() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">S</div>
           <div className="brand-copy">
             <strong>OwnerHub HRM</strong>
-            <span>Supabase CRM</span>
           </div>
         </div>
         <nav className="nav">
@@ -859,7 +857,7 @@ export default function RecruitingHub() {
 function titleForView(view) {
   if (view === "candidate") return ["Карточка кандидата", "Полный профиль, документы и путь онбординга"];
   return {
-    dashboard: ["Dashboard", "Обзор рекрутинга Owner-Operators"],
+    dashboard: ["Dashboard", ""],
     candidates: ["Кандидаты", "Единая база лидов и водителей"],
     calls: ["Скрипт звонка", "Интерактивный помощник HR"],
     pipeline: ["Воронка онбординга", "Перемещайте кандидатов между этапами"],
@@ -872,7 +870,6 @@ function SetupScreen() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <div className="brand-mark">S</div>
         <h1>Нужно добавить Supabase env</h1>
         <p>В Vercel Project Settings / Environment Variables добавь переменные из `.env.example`.</p>
         <pre>NEXT_PUBLIC_SUPABASE_URL{"\n"}NEXT_PUBLIC_SUPABASE_ANON_KEY</pre>
@@ -907,7 +904,6 @@ function AuthScreen() {
   return (
     <div className="auth-page">
       <form className="auth-card" onSubmit={submit}>
-        <div className="brand-mark">S</div>
         <h1>OwnerHub HRM</h1>
         <p>Войдите в Supabase аккаунт, чтобы открыть базу кандидатов.</p>
         <label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
@@ -937,12 +933,6 @@ function Dashboard({ db, openCandidate, openFollowup }) {
 
   return (
     <>
-      <div className="hero">
-        <div>
-          <h1>Вся рекрутинговая работа в одном процессе.</h1>
-          <p>Скрипт звонка, база Owner-Operators, документы, insurance, safety, dispatch и follow-ups теперь синхронизируются через Supabase.</p>
-        </div>
-      </div>
       <div className="grid stats-grid">
         <StatCard label="Всего кандидатов" value={total} icon="◎" note="Полная база лидов" />
         <StatCard label="В работе" value={qualified} icon="↗" note="Квалифицированы и проходят этапы" />
