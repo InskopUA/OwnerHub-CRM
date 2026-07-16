@@ -413,6 +413,55 @@ async function findExistingCandidate(workspaceId, lead) {
   return null;
 }
 
+const todayISO = () => {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
+
+async function createNewLeadFollowup(workspaceId, candidateId) {
+  const today = todayISO();
+  const { data: existing, error: existingError } = await supabaseAdmin
+    .from("followups")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("candidate_id", candidateId)
+    .eq("status", "open")
+    .limit(1);
+
+  if (existingError) throw existingError;
+  if (existing?.length) return;
+
+  const followupId = `fu_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const { error: followupError } = await supabaseAdmin.from("followups").insert({
+    id: followupId,
+    workspace_id: workspaceId,
+    candidate_id: candidateId,
+    followup_date: today,
+    followup_time: "10:00",
+    type: "Call",
+    note: "Call new Facebook lead today",
+    status: "open"
+  });
+  if (followupError) throw followupError;
+
+  const { error: candidateError } = await supabaseAdmin
+    .from("candidates")
+    .update({ next_follow_up: today })
+    .eq("id", candidateId)
+    .eq("workspace_id", workspaceId);
+  if (candidateError) throw candidateError;
+
+  const activityId = `act_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const { error: activityError } = await supabaseAdmin.from("activities").insert({
+    id: activityId,
+    workspace_id: workspaceId,
+    candidate_id: candidateId,
+    type: "followup",
+    text: "Auto follow-up created: call new lead today"
+  });
+  if (activityError) throw activityError;
+}
+
 export async function POST(request) {
   try {
     if (!hasSupabaseAdminEnv) {
@@ -471,6 +520,10 @@ export async function POST(request) {
       text: `Lead ${action} from Make`
     });
     if (activityError) throw activityError;
+
+    if (action === "created") {
+      await createNewLeadFollowup(workspaceId, candidateId);
+    }
 
     return NextResponse.json({ ok: true, action, candidate_id: candidateId, workspace_id: workspaceId });
   } catch (error) {

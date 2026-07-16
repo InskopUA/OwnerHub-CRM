@@ -617,6 +617,26 @@ export default function RecruitingHub() {
     }));
   }
 
+  async function createNewLeadFollowup(candidateId) {
+    const hasOpenFollowup = db.followups.some((item) => item.candidateId === candidateId && item.status === "open");
+    if (hasOpenFollowup) return;
+    await createFollowup(candidateId, todayISO(), "10:00", "Call", "Call new lead today");
+  }
+
+  async function createStatusFollowup(candidateId, status) {
+    const openNotes = db.followups
+      .filter((item) => item.candidateId === candidateId && item.status === "open")
+      .map((item) => item.note);
+
+    if (status === "docs_requested" && !openNotes.some((note) => note.includes("Check requested documents"))) {
+      await createFollowup(candidateId, addDays(2), "10:00", "Documents", "Check requested documents");
+    }
+
+    if (status === "contact_attempted" && !openNotes.some((note) => note.includes("Second call attempt"))) {
+      await createFollowup(candidateId, addDays(1), "10:00", "Call", "Second call attempt");
+    }
+  }
+
   async function completeFollowup(followupId) {
     const completedAt = new Date().toISOString();
     const { error } = await supabase
@@ -666,6 +686,7 @@ export default function RecruitingHub() {
     const next = { ...candidate, status, updatedAt: new Date().toISOString() };
     try {
       await saveCandidate(next, `Статус: ${statusMap[oldStatus]} -> ${statusMap[status]}`, "status");
+      await createStatusFollowup(candidateId, status);
       notify(`Кандидат перемещён: ${statusMap[status]}`);
     } catch (error) {
       notify(error.message);
@@ -757,6 +778,9 @@ export default function RecruitingHub() {
               setUi={setUi}
               openCandidate={(id) => setUi((current) => ({ ...current, view: "candidate", selectedCandidateId: id }))}
               editCandidate={(candidate) => setModal({ type: "candidate", candidate })}
+              startCall={(candidateId) => setUi((current) => ({ ...current, view: "calls", callCandidateId: candidateId }))}
+              addFollowup={(candidateId) => setModal({ type: "followup", candidateId })}
+              updateStatus={updateCandidateStatus}
             />
           )}
           {ui.view === "candidate" && selectedCandidate && (
@@ -765,7 +789,9 @@ export default function RecruitingHub() {
               activities={db.activities.filter((activity) => activity.candidateId === selectedCandidate.id).slice(0, 12)}
               updateCandidate={async (candidate, activityText, activityType) => {
                 try {
+                  const previousStatus = selectedCandidate.status;
                   await saveCandidate(candidate, activityText, activityType);
+                  if (candidate.status !== previousStatus) await createStatusFollowup(candidate.id, candidate.status);
                   notify("Сохранено");
                 } catch (error) {
                   notify(error.message);
@@ -819,6 +845,7 @@ export default function RecruitingHub() {
             try {
               const exists = db.candidates.some((item) => item.id === candidate.id);
               const saved = await saveCandidate(candidate, exists ? "Карточка кандидата обновлена" : "Кандидат создан", exists ? "edit" : "create");
+              if (!exists) await createNewLeadFollowup(saved.id);
               setModal(null);
               setUi((current) => ({
                 ...current,
@@ -988,7 +1015,7 @@ function CandidateMiniTable({ candidates, openCandidate }) {
   );
 }
 
-function CandidatesView({ db, ui, setUi, openCandidate, editCandidate }) {
+function CandidatesView({ db, ui, setUi, openCandidate, editCandidate, startCall, addFollowup, updateStatus }) {
   const query = ui.filters.search.toLowerCase().trim();
   const list = db.candidates
     .filter((candidate) => {
@@ -1015,10 +1042,30 @@ function CandidatesView({ db, ui, setUi, openCandidate, editCandidate }) {
       {list.length ? (
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Кандидат</th><th>Локация</th><th>Работа</th><th>Техника</th><th>Статус</th><th>Следующий контакт</th><th>Score</th><th /></tr></thead>
+            <thead><tr><th>Кандидат</th><th>Локация</th><th>Работа</th><th>Техника</th><th>Статус</th><th>Следующий контакт</th><th>Score</th><th>Quick actions</th></tr></thead>
             <tbody>{list.map((candidate) => {
               const followup = db.followups.filter((item) => item.candidateId === candidate.id && item.status === "open").sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))[0];
-              return <tr key={candidate.id}><td onClick={() => openCandidate(candidate.id)} className="clickable"><Person candidate={candidate} /></td><td>{[candidate.city, candidate.state].filter(Boolean).join(", ") || "-"}<br /><small>{candidate.zip}</small></td><td>{candidate.workPreference || "-"}<br /><small>{candidate.homeTime}</small></td><td>{[candidate.truck.make, candidate.truck.model].filter(Boolean).join(" ") || "-"}<br /><small>{[candidate.trailer.make, candidate.trailer.model].filter(Boolean).join(" ")}</small></td><td><StatusBadge status={candidate.status} /></td><td>{followup ? `${fmtDate(followup.date)} · ${followup.time}` : "-"}</td><td><Score value={candidate.score} /></td><td><button className="btn btn-small" onClick={() => editCandidate(candidate)}>✎</button></td></tr>;
+              return (
+                <tr key={candidate.id}>
+                  <td onClick={() => openCandidate(candidate.id)} className="clickable"><Person candidate={candidate} /></td>
+                  <td>{[candidate.city, candidate.state].filter(Boolean).join(", ") || "-"}<br /><small>{candidate.zip}</small></td>
+                  <td>{candidate.workPreference || "-"}<br /><small>{candidate.homeTime}</small></td>
+                  <td>{[candidate.truck.make, candidate.truck.model].filter(Boolean).join(" ") || "-"}<br /><small>{[candidate.trailer.make, candidate.trailer.model].filter(Boolean).join(" ")}</small></td>
+                  <td><StatusBadge status={candidate.status} /></td>
+                  <td>{followup ? `${fmtDate(followup.date)} · ${followup.time}` : "-"}</td>
+                  <td><Score value={candidate.score} /></td>
+                  <td>
+                    <div className="quick-actions">
+                      <button className="btn btn-small" onClick={() => startCall(candidate.id)}>☎ Script</button>
+                      <button className="btn btn-small" onClick={() => addFollowup(candidate.id)}>＋ FU</button>
+                      <button className="btn btn-small" onClick={() => editCandidate(candidate)}>✎</button>
+                      <select value={candidate.status} onChange={(event) => updateStatus(candidate.id, event.target.value)} aria-label={`Change status for ${fullName(candidate)}`}>
+                        {statuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                      </select>
+                    </div>
+                  </td>
+                </tr>
+              );
             })}</tbody>
           </table>
         </div>
