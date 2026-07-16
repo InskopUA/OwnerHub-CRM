@@ -61,26 +61,26 @@ Make.com lead webhook:
    Body input method: JSON string
    Parse response: Yes
 
-Пример JSON для Make. Поля внутри кавычек нужно выбирать из модуля Get Lead Details:
+Основной JSON для Make. Field data нужно выбрать из модуля Get Lead Details и вставить без кавычек:
+{
+  "source": "Facebook Lead Form",
+  "field_data": {{Field data}},
+  "notes": "Imported from Make"
+}
+
+Если Field data не отображается в Make, можно выбрать отдельные поля из Get Lead Details:
 {
   "name": "{{Full Name}}",
   "phone": "{{Phone Number}}",
   "email": "{{Email}}",
   "source": "Facebook Lead Form",
-  "city": "{{City}}",
-  "state": "{{State}}",
-  "zip": "{{ZIP}}",
-  "workPreference": "{{Work Preference}}",
-  "truckMake": "{{Truck Make}}",
-  "truckModel": "{{Truck Model}}",
-  "trailerMake": "{{Trailer Make}}",
   "notes": "Imported from Make"
 }
 
 Webhook делает dedupe по phone или email внутри workspace: если кандидат уже есть, он обновится, если нет - создастся новый.
 Каждый token привязан к конкретному workspace, поэтому разные пользователи могут самостоятельно подключить свои Facebook/Instagram лиды.
 Если форм несколько, создайте отдельный Make scenario на каждую Facebook Lead Form. URL и token можно использовать те же для одного workspace.
-Webhook умеет smart mapping: разные названия полей вроде full_name, phone_number, city, truck_make и русские названия распознаются автоматически. Нераспознанные ответы сохраняются в notes кандидата.
+Webhook умеет smart mapping: он читает field_data, разные названия полей вроде full_name, phone_number, city, truck_make и русские названия распознаются автоматически. Нераспознанные ответы сохраняются в notes кандидата.
 
 Важно:
 - SUPABASE_SERVICE_ROLE_KEY нельзя добавлять во frontend и нельзя делать NEXT_PUBLIC.

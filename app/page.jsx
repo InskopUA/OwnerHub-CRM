@@ -1428,25 +1428,28 @@ Parse response: Yes`}</pre>
 
           <div className="guide-step">
             <b>5. Body content</b>
-            <p>Вставь JSON ниже. Черные токены внутри кавычек выбирай только из второго модуля Get Lead Details. Названия руками лучше не печатать, выбирай поля из списка Make.</p>
+            <p>Вставь JSON ниже. В поле field_data нужно выбрать Field data из второго модуля Get Lead Details. Не пиши field_data руками и не ставь кавычки вокруг выбранного токена.</p>
+            <pre>{`{
+  "source": "Facebook Lead Form",
+  "field_data": {{Field data}},
+  "notes": "Imported from Make"
+}`}</pre></div>
+
+          <div className="guide-step">
+            <b>Если Field data нет в списке</b>
+            <p>Тогда выбери отдельные поля из Get Lead Details вручную. Этот вариант хуже для разных форм, но тоже работает.</p>
             <pre>{`{
   "name": "{{Full Name}}",
   "phone": "{{Phone Number}}",
   "email": "{{Email}}",
   "source": "Facebook Lead Form",
-  "city": "{{City}}",
-  "state": "{{State}}",
-  "zip": "{{ZIP}}",
-  "workPreference": "{{Work Preference}}",
-  "truckMake": "{{Truck Make}}",
-  "truckModel": "{{Truck Model}}",
-  "trailerMake": "{{Trailer Make}}",
   "notes": "Imported from Make"
-}`}</pre></div>
+}`}</pre>
+          </div>
 
           <div className="guide-step">
             <b>6. Smart mapping</b>
-            <p>Формы могут быть разными. Webhook понимает full_name, phone_number, email, city, state, CDL, truck_make, trailer_make, русские названия и похожие варианты. Нераспознанные ответы не теряются: они сохраняются в комментарии кандидата.</p>
+            <p>Формы могут быть разными. Webhook читает field_data и сам раскладывает full_name, phone_number, email, city, state, CDL, truck_make, trailer_make, русские названия и похожие варианты. Нераспознанные ответы не теряются: они сохраняются в комментарии кандидата.</p>
           </div>
 
           <div className="guide-step">
@@ -1468,7 +1471,7 @@ New Lead → Get Lead Details → HTTP OwnerHub`}</pre>
 
           <div className="guide-step">
             <b>Частые ошибки</b>
-            <p>Page field принимает Page из dropdown или numeric Page ID, не текстовое название. Lead ID во втором модуле должен приходить из первого модуля New Lead. Поля name, phone и email в HTTP body нужно выбирать из Get Lead Details.</p>
+            <p>Page field принимает Page из dropdown или numeric Page ID, не текстовое название. Lead ID во втором модуле должен приходить из первого модуля New Lead. Field data в HTTP body нужно выбирать из Get Lead Details и ставить без кавычек.</p>
           </div>
         </div>
         <div className="modal-foot"><button className="btn btn-primary" onClick={onClose}>Готово</button></div>
