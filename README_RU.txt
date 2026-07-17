@@ -43,6 +43,8 @@ Make.com lead webhook:
 1. В Vercel добавьте SUPABASE_SERVICE_ROLE_KEY. Это серверный ключ, он используется только в API route.
 2. Пользователь входит в OwnerHub HRM и открывает Settings -> Make Integration.
 3. Нажимает Generate token.
+   Новый token удаляет старые webhook tokens в этом workspace.
+   Текущий token можно открыть и скопировать в Settings в любое время.
 4. В Make создаёт scenario по схеме:
    Facebook Lead Ads - New Lead
    -> Facebook Lead Ads - Get Lead Details
@@ -90,7 +92,7 @@ Call knowledge base:
 - во время звонка система показывает recommended script blocks по текущему кандидату и шагу скрипта;
 - данные хранятся в таблице call_knowledge_items и изолированы по workspace;
 - offer_profile хранится в app_settings;
-- после обновления проекта обязательно прогоните актуальный supabase_schema.sql, чтобы создать новую таблицу, колонку offer_profile и RLS policies.
+- после обновления проекта обязательно прогоните актуальный supabase_schema.sql, чтобы создать новую таблицу, колонку offer_profile, колонку token_value и RLS policies.
 
 Важно:
 - SUPABASE_SERVICE_ROLE_KEY нельзя добавлять во frontend и нельзя делать NEXT_PUBLIC.

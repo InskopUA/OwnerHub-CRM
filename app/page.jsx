@@ -1749,6 +1749,8 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
   const [showGuide, setShowGuide] = useState(false);
   const [busy, setBusy] = useState(false);
   const webhookUrl = typeof window === "undefined" ? "/api/make/leads" : `${window.location.origin}/api/make/leads`;
+  const currentToken = tokens.find((token) => token.active) || tokens[0] || null;
+  const visibleToken = currentToken?.token_value || generatedToken || "";
 
   useEffect(() => {
     if (!workspace?.id) return;
@@ -1762,13 +1764,32 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
   }
 
   async function loadTokens() {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("workspace_webhook_tokens")
-      .select("id, name, token_preview, active, created_at, last_used_at")
+      .select("id, name, token_value, token_preview, active, created_at, last_used_at")
       .eq("workspace_id", workspace.id)
       .order("created_at", { ascending: false });
 
+    if (error?.code === "42703") {
+      const fallback = await supabase
+        .from("workspace_webhook_tokens")
+        .select("id, name, token_preview, active, created_at, last_used_at")
+        .eq("workspace_id", workspace.id)
+        .order("created_at", { ascending: false });
+      data = fallback.data;
+      error = fallback.error;
+    }
+
     if (!error) setTokens(data || []);
+  }
+
+  async function copyToken(token) {
+    if (!token) return;
+    try {
+      await globalThis.navigator?.clipboard?.writeText(token);
+    } catch {
+      // Selecting the field still gives a reliable manual copy fallback.
+    }
   }
 
   async function generateToken() {
@@ -1780,9 +1801,17 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
       const token = `ohwh_${Array.from(raw).map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
       const tokenHash = await hashToken(token);
       const preview = `${token.slice(0, 10)}...${token.slice(-6)}`;
+
+      const deleted = await supabase
+        .from("workspace_webhook_tokens")
+        .delete()
+        .eq("workspace_id", workspace.id);
+      if (deleted.error) throw deleted.error;
+
       const { error } = await supabase.from("workspace_webhook_tokens").insert({
         workspace_id: workspace.id,
         name: "Make",
+        token_value: token,
         token_hash: tokenHash,
         token_preview: preview,
         active: true
@@ -1799,10 +1828,13 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
   async function revokeToken(id) {
     const { error } = await supabase
       .from("workspace_webhook_tokens")
-      .update({ active: false })
+      .delete()
       .eq("id", id)
       .eq("workspace_id", workspace.id);
-    if (!error) await loadTokens();
+    if (!error) {
+      setGeneratedToken("");
+      await loadTokens();
+    }
   }
 
   return (
@@ -1822,29 +1854,30 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
           <input readOnly value={webhookUrl} onFocus={(event) => event.target.select()} />
         </div>
         <div className="settings-row">
-          <div className="settings-copy"><strong>Personal token</strong><p>Каждый токен привязан только к этому workspace. Лиды попадут только в эту систему.</p></div>
-          <button className="btn btn-primary" disabled={busy || !workspace?.id} onClick={generateToken}>{busy ? "Создаём..." : "Generate token"}</button>
+          <div className="settings-copy"><strong>Personal token</strong><p>При генерации нового токена старые токены удаляются. В Make должен использоваться только текущий token.</p></div>
+          <button className="btn btn-primary" disabled={busy || !workspace?.id} onClick={generateToken}>{busy ? "Создаём..." : "Generate new token"}</button>
         </div>
-        {generatedToken ? (
-          <div className="settings-row">
-            <div className="settings-copy"><strong>Новый token</strong><p>Скопируй сейчас. После закрытия он будет скрыт, в базе хранится только hash.</p></div>
-            <textarea readOnly value={generatedToken} onFocus={(event) => event.target.select()} />
-          </div>
-        ) : null}
         <div className="settings-row">
-          <div className="settings-copy"><strong>Active tokens</strong><p>Можно отключить старый токен и создать новый.</p></div>
+          <div className="settings-copy"><strong>Current token</strong><p>Этот token можно копировать в любое время. Хранится только внутри текущего workspace.</p></div>
+          <div className="token-copy-box">
+            <textarea readOnly value={visibleToken || "Token ещё не создан"} onFocus={(event) => event.target.select()} />
+            <button className="btn btn-small" disabled={!visibleToken} onClick={() => copyToken(visibleToken)}>Copy token</button>
+          </div>
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><strong>Token status</strong><p>В системе должен быть только один активный token. Новый token автоматически заменяет старый.</p></div>
           <div className="token-list">
             {tokens.length ? tokens.map((token) => (
               <div className="token-row" key={token.id}>
-                <div><strong>{token.name}</strong><span>{token.token_preview} · {token.active ? "active" : "disabled"}</span></div>
-                {token.active ? <button className="btn btn-small btn-danger" onClick={() => revokeToken(token.id)}>Disable</button> : null}
+                <div><strong>{token.name}</strong><span>{token.token_preview} · {token.active ? "active" : "inactive"}</span></div>
+                <button className="btn btn-small btn-danger" onClick={() => revokeToken(token.id)}>Delete</button>
               </div>
             )) : <div className="section-note">Токены ещё не созданы.</div>}
           </div>
         </div>
       </div>
 
-      {showGuide ? <MakeGuideModal webhookUrl={webhookUrl} token={generatedToken} onClose={() => setShowGuide(false)} /> : null}
+      {showGuide ? <MakeGuideModal webhookUrl={webhookUrl} token={visibleToken} onClose={() => setShowGuide(false)} /> : null}
     </>
   );
 }

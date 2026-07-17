@@ -108,6 +108,7 @@ create table if not exists public.workspace_webhook_tokens (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
   name text not null default 'Make',
+  token_value text not null default '',
   token_hash text not null unique,
   token_preview text not null default '',
   active boolean not null default true,
@@ -283,6 +284,7 @@ create table if not exists public.activities (
 alter table public.app_settings add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.app_settings add column if not exists offer_profile jsonb not null default '{}'::jsonb;
 alter table public.workspace_webhook_tokens add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
+alter table public.workspace_webhook_tokens add column if not exists token_value text not null default '';
 alter table public.candidates add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.candidate_equipment add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.candidate_documents add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
