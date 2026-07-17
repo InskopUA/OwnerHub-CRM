@@ -162,6 +162,25 @@ small { color: var(--muted); }
 .bar-row { display: grid; grid-template-columns: 116px 1fr 34px; gap: 10px; align-items: center; margin: 12px 0; font-size: 12px; }
 .bar-track { height: 9px; background: #f0f0ed; border-radius: 999px; overflow: hidden; }
 .bar-fill { height: 100%; background: var(--yellow); border-radius: 999px; }
+.segmented { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: #fbfbfa; }
+.segmented button { border: 0; background: transparent; border-radius: 9px; padding: 7px 10px; font-size: 12px; font-weight: 850; color: var(--muted); }
+.segmented button.active { background: var(--yellow); color: var(--ink); }
+.analytics-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.analytics-kpis .stat-card { min-height: 118px; }
+.analytics-kpis .stat-value { font-size: 26px; }
+.analytics-chart { height: 230px; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(30px, 1fr); align-items: end; gap: 10px; padding: 12px 4px 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.analytics-day { min-width: 30px; display: grid; grid-template-rows: 1fr auto; gap: 9px; height: 100%; }
+.analytics-bars { min-height: 0; display: flex; align-items: end; justify-content: center; gap: 3px; height: 100%; }
+.analytics-bars span { width: 8px; min-height: 0; border-radius: 999px 999px 0 0; transition: .18s ease; }
+.analytics-bars span:hover { filter: brightness(.94); }
+.bar-calls { background: var(--yellow); }
+.bar-leads { background: var(--blue); }
+.bar-talk { background: var(--green); }
+.analytics-day-label { color: var(--muted); font-size: 10px; text-align: center; white-space: nowrap; }
+.analytics-legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-top: 12px; color: var(--muted); font-size: 11px; font-weight: 800; }
+.analytics-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.analytics-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.analytics-table { min-width: 980px; }
 
 .kanban { display: grid; grid-auto-flow: column; grid-auto-columns: 285px; gap: 14px; overflow-x: auto; padding-bottom: 12px; align-items: start; }
 .kanban-col { background: #efefec; border-radius: 16px; padding: 12px; min-height: 560px; border: 1px solid #e4e4e0; }

@@ -44,6 +44,7 @@ const interfaceCopy = {
     calls: "Скрипт звонка",
     pipeline: "Воронка",
     followups: "Follow-ups",
+    analytics: "Аналитика",
     settings: "Настройки",
     logout: "Выйти",
     connected: "Supabase подключён",
@@ -58,6 +59,7 @@ const interfaceCopy = {
     pageCallsSubtitle: "База знаний и интерактивный помощник HR",
     pagePipelineSubtitle: "Перемещайте кандидатов между этапами",
     pageFollowupsSubtitle: "План контактов и напоминаний",
+    pageAnalyticsSubtitle: "Ежедневная продуктивность HR и звонков",
     pageSettingsSubtitle: "Supabase, Vercel и параметры системы",
     totalCandidates: "Всего кандидатов",
     fullLeadBase: "Полная база лидов",
@@ -193,6 +195,31 @@ const interfaceCopy = {
     deletedCandidate: "Кандидат удалён",
     noComment: "Без комментария"
     ,
+    analyticsTitle: "Продуктивность HR",
+    analyticsNote: "Звонки, время разговора, follow-ups и обработанные лиды по дням.",
+    periodToday: "Сегодня",
+    period7Days: "7 дней",
+    period30Days: "30 дней",
+    callsMade: "Звонков",
+    talkTime: "Время разговора",
+    leadsProcessed: "Лидов обработано",
+    followupsDone: "Follow-ups выполнено",
+    productiveCalls: "Результативные звонки",
+    activeWorkWindow: "Рабочее окно",
+    productiveCallsNote: "Ответили 60+ сек или есть summary/запись",
+    dailyBreakdown: "Разбивка по дням",
+    dailyBreakdownNote: "Что реально происходило каждый день",
+    day: "День",
+    newLeadsMetric: "Новые лиды",
+    updatedLeadsMetric: "Обновления",
+    outbound: "Исходящие",
+    incoming: "Входящие",
+    avgCall: "Средний звонок",
+    summariesMetric: "Summary",
+    recordingsMetric: "Записи",
+    followupsCreated: "FU создано",
+    noAnalyticsData: "Нет активности за выбранный период.",
+    workWindowNote: "От первого до последнего события за день",
     status_new: "Новый лид",
     status_contact_attempted: "Контакт",
     status_qualified: "Квалифицирован",
@@ -268,6 +295,7 @@ const interfaceCopy = {
     calls: "Call Script",
     pipeline: "Pipeline",
     followups: "Follow-ups",
+    analytics: "Analytics",
     settings: "Settings",
     logout: "Log out",
     connected: "Supabase connected",
@@ -282,6 +310,7 @@ const interfaceCopy = {
     pageCallsSubtitle: "Knowledge base and interactive HR assistant",
     pagePipelineSubtitle: "Move candidates between stages",
     pageFollowupsSubtitle: "Contact plan and reminders",
+    pageAnalyticsSubtitle: "Daily HR productivity and call performance",
     pageSettingsSubtitle: "Supabase, Vercel, and system settings",
     totalCandidates: "Total Candidates",
     fullLeadBase: "Complete lead database",
@@ -416,6 +445,31 @@ const interfaceCopy = {
     noContact: "No contact",
     deletedCandidate: "Candidate deleted",
     noComment: "No comment",
+    analyticsTitle: "HR Productivity",
+    analyticsNote: "Calls, talk time, follow-ups, and processed leads by day.",
+    periodToday: "Today",
+    period7Days: "7 days",
+    period30Days: "30 days",
+    callsMade: "Calls",
+    talkTime: "Talk time",
+    leadsProcessed: "Leads processed",
+    followupsDone: "Follow-ups done",
+    productiveCalls: "Productive calls",
+    activeWorkWindow: "Work window",
+    productiveCallsNote: "Answered 60+ sec or has summary/recording",
+    dailyBreakdown: "Daily breakdown",
+    dailyBreakdownNote: "What actually happened each day",
+    day: "Day",
+    newLeadsMetric: "New leads",
+    updatedLeadsMetric: "Updates",
+    outbound: "Outbound",
+    incoming: "Incoming",
+    avgCall: "Avg call",
+    summariesMetric: "Summaries",
+    recordingsMetric: "Recordings",
+    followupsCreated: "FU created",
+    noAnalyticsData: "No activity in the selected period.",
+    workWindowNote: "From first to last event of the day",
     status_new: "New Lead",
     status_contact_attempted: "Contacting",
     status_qualified: "Qualified",
@@ -689,6 +743,39 @@ function fmtDate(value, withTime = false) {
   return date.toLocaleDateString("ru-RU", withTime
     ? { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }
     : { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function localDateKey(value) {
+  if (!value) return "";
+  const date = new Date(String(value).length === 10 ? `${value}T12:00:00` : value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function secondsBetween(start, end) {
+  const startDate = new Date(start || "");
+  const endDate = new Date(end || "");
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return 0;
+  return Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / 1000));
+}
+
+function formatDuration(seconds) {
+  const total = Math.max(0, Math.round(Number(seconds) || 0));
+  if (!total) return "0m";
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.round((total % 3600) / 60);
+  if (hours && minutes) return `${hours}h ${minutes}m`;
+  if (hours) return `${hours}h`;
+  return `${minutes || 1}m`;
+}
+
+function buildDateRange(days) {
+  return Array.from({ length: days }, (_, index) => {
+    const date = new Date();
+    date.setHours(12, 0, 0, 0);
+    date.setDate(date.getDate() - (days - index - 1));
+    return localDateKey(date.toISOString());
+  });
 }
 
 function getPath(obj, path) {
@@ -1762,6 +1849,7 @@ export default function RecruitingHub() {
             ["calls", "☎", t("calls")],
             ["pipeline", "▥", t("pipeline")],
             ["followups", "✓", t("followups")],
+            ["analytics", "▤", t("analytics")],
             ["settings", "⚙", t("settings")]
           ].map(([view, icon, label]) => (
             <button
@@ -1873,6 +1961,7 @@ export default function RecruitingHub() {
               addFollowup={() => setModal({ type: "followup" })}
             />
           )}
+          {ui.view === "analytics" && <AnalyticsView db={db} />}
           {ui.view === "settings" && <SettingsView db={db} workspace={workspace} updateSettings={updateSettings} reload={loadRemoteData} />}
         </section>
       </main>
@@ -1953,6 +2042,7 @@ function titleForView(view, t) {
     calls: [t("calls"), t("pageCallsSubtitle")],
     pipeline: [t("pipeline"), t("pagePipelineSubtitle")],
     followups: [t("followups"), t("pageFollowupsSubtitle")],
+    analytics: [t("analytics"), t("pageAnalyticsSubtitle")],
     settings: [t("settings"), t("pageSettingsSubtitle")]
   }[view] || ["OwnerHub HRM", ""];
 }
@@ -2712,6 +2802,214 @@ function FollowupsView({ db, ui, setUi, openCandidate, completeFollowup, snoozeF
 function FollowColumn({ title, list, db, openCandidate, completeFollowup, snoozeFollowup, badge }) {
   const { t } = useI18n();
   return <div className="card card-pad"><SectionTitle title={title} action={<span className={`badge ${badge}`}>{list.length}</span>} />{list.length ? <div className="follow-list">{list.map((followup) => <FollowItem key={followup.id} followup={followup} candidate={db.candidates.find((candidate) => candidate.id === followup.candidateId)} openCandidate={openCandidate} completeFollowup={completeFollowup} snoozeFollowup={snoozeFollowup} />)}</div> : <div className="section-note padded">{t("noTasks")}</div>}</div>;
+}
+
+function AnalyticsView({ db }) {
+  const { t } = useI18n();
+  const [period, setPeriod] = useState(7);
+  const analytics = useMemo(() => buildAnalytics(db, period), [db, period]);
+
+  return (
+    <div className="grid">
+      <div className="card card-pad">
+        <SectionTitle
+          title={t("analyticsTitle")}
+          note={t("analyticsNote")}
+          action={(
+            <div className="segmented">
+              {[
+                [1, t("periodToday")],
+                [7, t("period7Days")],
+                [30, t("period30Days")]
+              ].map(([value, label]) => (
+                <button key={value} className={period === value ? "active" : ""} onClick={() => setPeriod(value)}>{label}</button>
+              ))}
+            </div>
+          )}
+        />
+        <div className="stats-grid analytics-kpis">
+          <StatCard label={t("callsMade")} value={analytics.totals.calls} icon="☎" note={`${t("outbound")}: ${analytics.totals.outbound} · ${t("incoming")}: ${analytics.totals.incoming}`} />
+          <StatCard label={t("talkTime")} value={formatDuration(analytics.totals.talkSeconds)} icon="◷" note={`${t("avgCall")}: ${formatDuration(analytics.totals.avgCallSeconds)}`} />
+          <StatCard label={t("leadsProcessed")} value={analytics.totals.processedLeads} icon="◎" note={`${t("newLeadsMetric")}: ${analytics.totals.newLeads} · ${t("updatedLeadsMetric")}: ${analytics.totals.updatedLeads}`} />
+          <StatCard label={t("followupsDone")} value={analytics.totals.followupsDone} icon="✓" note={`${t("followupsCreated")}: ${analytics.totals.followupsCreated}`} />
+          <StatCard label={t("productiveCalls")} value={analytics.totals.productiveCalls} icon="↗" note={t("productiveCallsNote")} />
+          <StatCard label={t("activeWorkWindow")} value={formatDuration(analytics.totals.workWindowSeconds)} icon="▥" note={t("workWindowNote")} />
+        </div>
+      </div>
+
+      <div className="card card-pad">
+        <SectionTitle title={t("dailyBreakdown")} note={t("dailyBreakdownNote")} />
+        {analytics.days.some((day) => day.hasActivity) ? (
+          <>
+            <div className="analytics-chart">
+              {analytics.days.map((day) => (
+                <div className="analytics-day" key={day.date}>
+                  <div className="analytics-bars">
+                    <span className="bar-calls" style={{ height: `${analytics.max.calls ? Math.max(8, (day.calls / analytics.max.calls) * 100) : 0}%` }} title={`${t("callsMade")}: ${day.calls}`} />
+                    <span className="bar-leads" style={{ height: `${analytics.max.processedLeads ? Math.max(8, (day.processedLeads / analytics.max.processedLeads) * 100) : 0}%` }} title={`${t("leadsProcessed")}: ${day.processedLeads}`} />
+                    <span className="bar-talk" style={{ height: `${analytics.max.talkSeconds ? Math.max(8, (day.talkSeconds / analytics.max.talkSeconds) * 100) : 0}%` }} title={`${t("talkTime")}: ${formatDuration(day.talkSeconds)}`} />
+                  </div>
+                  <div className="analytics-day-label">{day.shortLabel}</div>
+                </div>
+              ))}
+            </div>
+            <div className="analytics-legend">
+              <span><i className="bar-calls" />{t("callsMade")}</span>
+              <span><i className="bar-leads" />{t("leadsProcessed")}</span>
+              <span><i className="bar-talk" />{t("talkTime")}</span>
+            </div>
+            <div className="table-wrap mt-small">
+              <table className="compact-table analytics-table">
+                <thead><tr><th>{t("day")}</th><th>{t("callsMade")}</th><th>{t("talkTime")}</th><th>{t("leadsProcessed")}</th><th>{t("newLeadsMetric")}</th><th>{t("updatedLeadsMetric")}</th><th>{t("summariesMetric")}</th><th>{t("recordingsMetric")}</th><th>{t("followupsDone")}</th><th>{t("activeWorkWindow")}</th></tr></thead>
+                <tbody>{analytics.days.slice().reverse().map((day) => (
+                  <tr key={day.date}>
+                    <td><strong>{day.label}</strong></td>
+                    <td>{day.calls}<br /><small>{t("outbound")}: {day.outbound} · {t("incoming")}: {day.incoming}</small></td>
+                    <td>{formatDuration(day.talkSeconds)}<br /><small>{t("avgCall")}: {formatDuration(day.avgCallSeconds)}</small></td>
+                    <td>{day.processedLeads}</td>
+                    <td>{day.newLeads}</td>
+                    <td>{day.updatedLeads}</td>
+                    <td>{day.summaries}</td>
+                    <td>{day.recordings}</td>
+                    <td>{day.followupsDone}<br /><small>{t("followupsCreated")}: {day.followupsCreated}</small></td>
+                    <td>{formatDuration(day.workWindowSeconds)}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </>
+        ) : <Empty title={t("noAnalyticsData")} note={t("analyticsNote")} />}
+      </div>
+    </div>
+  );
+}
+
+function buildAnalytics(db, period) {
+  const dateKeys = buildDateRange(period);
+  const days = dateKeys.map((date) => createAnalyticsDay(date));
+  const dayMap = Object.fromEntries(days.map((day) => [day.date, day]));
+
+  const touchDay = (date, candidateId, timestamp) => {
+    const key = localDateKey(date);
+    const day = dayMap[key];
+    if (!day) return null;
+    if (candidateId) day.processedCandidateIds.add(candidateId);
+    if (timestamp) day.events.push(new Date(timestamp).getTime());
+    return day;
+  };
+
+  db.candidates.forEach((candidate) => {
+    const createdDay = touchDay(candidate.createdAt, candidate.id, candidate.createdAt);
+    if (createdDay) createdDay.newLeads += 1;
+
+    const updatedDay = touchDay(candidate.updatedAt, candidate.id, candidate.updatedAt);
+    if (updatedDay && localDateKey(candidate.updatedAt) !== localDateKey(candidate.createdAt)) updatedDay.updatedLeads += 1;
+  });
+
+  db.activities.forEach((activity) => {
+    const day = touchDay(activity.createdAt, activity.candidateId, activity.createdAt);
+    if (day && activity.type === "status") day.statusChanges += 1;
+  });
+
+  db.followups.forEach((followup) => {
+    const createdDay = touchDay(followup.createdAt, followup.candidateId, followup.createdAt);
+    if (createdDay) createdDay.followupsCreated += 1;
+    const doneDay = followup.completedAt ? touchDay(followup.completedAt, followup.candidateId, followup.completedAt) : null;
+    if (doneDay) doneDay.followupsDone += 1;
+  });
+
+  db.quoCalls.forEach((call) => {
+    const callDate = call.completedAt || call.answeredAt || call.createdAt;
+    const day = touchDay(callDate, call.candidateId, callDate);
+    if (!day) return;
+    day.calls += 1;
+    if (call.direction === "outgoing") day.outbound += 1;
+    if (call.direction === "incoming") day.incoming += 1;
+    const duration = callDurationSeconds(call);
+    day.talkSeconds += duration;
+    if (call.summary.length || call.nextSteps.length) day.summaries += 1;
+    if (call.recordingUrl) day.recordings += 1;
+    if (call.answeredAt) day.answered += 1;
+    if (duration >= 60 || call.summary.length || call.nextSteps.length || call.recordingUrl) day.productiveCalls += 1;
+  });
+
+  days.forEach((day) => {
+    const times = day.events.filter(Number.isFinite).sort((a, b) => a - b);
+    day.processedLeads = day.processedCandidateIds.size;
+    day.avgCallSeconds = day.calls ? Math.round(day.talkSeconds / day.calls) : 0;
+    day.workWindowSeconds = times.length > 1 ? Math.round((times.at(-1) - times[0]) / 1000) : 0;
+    day.hasActivity = Boolean(day.calls || day.processedLeads || day.followupsCreated || day.followupsDone || day.newLeads || day.updatedLeads);
+    delete day.processedCandidateIds;
+    delete day.events;
+  });
+
+  const totals = days.reduce((acc, day) => {
+    ["calls", "outbound", "incoming", "answered", "talkSeconds", "newLeads", "updatedLeads", "processedLeads", "followupsCreated", "followupsDone", "summaries", "recordings", "productiveCalls", "statusChanges", "workWindowSeconds"].forEach((key) => {
+      acc[key] += day[key] || 0;
+    });
+    return acc;
+  }, {
+    calls: 0,
+    outbound: 0,
+    incoming: 0,
+    answered: 0,
+    talkSeconds: 0,
+    newLeads: 0,
+    updatedLeads: 0,
+    processedLeads: 0,
+    followupsCreated: 0,
+    followupsDone: 0,
+    summaries: 0,
+    recordings: 0,
+    productiveCalls: 0,
+    statusChanges: 0,
+    workWindowSeconds: 0
+  });
+  totals.avgCallSeconds = totals.calls ? Math.round(totals.talkSeconds / totals.calls) : 0;
+
+  return {
+    days,
+    totals,
+    max: {
+      calls: Math.max(...days.map((day) => day.calls), 0),
+      processedLeads: Math.max(...days.map((day) => day.processedLeads), 0),
+      talkSeconds: Math.max(...days.map((day) => day.talkSeconds), 0)
+    }
+  };
+}
+
+function createAnalyticsDay(date) {
+  const dateObj = new Date(`${date}T12:00:00`);
+  return {
+    date,
+    label: dateObj.toLocaleDateString("ru-RU", { day: "2-digit", month: "short" }),
+    shortLabel: dateObj.toLocaleDateString("ru-RU", { day: "2-digit", month: "short" }).replace(".", ""),
+    calls: 0,
+    outbound: 0,
+    incoming: 0,
+    answered: 0,
+    talkSeconds: 0,
+    avgCallSeconds: 0,
+    newLeads: 0,
+    updatedLeads: 0,
+    processedLeads: 0,
+    followupsCreated: 0,
+    followupsDone: 0,
+    summaries: 0,
+    recordings: 0,
+    productiveCalls: 0,
+    statusChanges: 0,
+    workWindowSeconds: 0,
+    hasActivity: false,
+    processedCandidateIds: new Set(),
+    events: []
+  };
+}
+
+function callDurationSeconds(call) {
+  const timed = secondsBetween(call.answeredAt, call.completedAt);
+  if (timed) return timed;
+  return Math.max(0, Math.round(Number(call.recordingDuration) || 0));
 }
 
 function SettingsView({ db, workspace, updateSettings, reload }) {
