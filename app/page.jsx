@@ -464,6 +464,47 @@ function useI18n() {
   return useContext(I18nContext);
 }
 
+function readUiFromHash() {
+  if (typeof window === "undefined") return {};
+  const raw = window.location.hash.startsWith("#/") ? window.location.hash.slice(2) : "";
+  const params = new globalThis.URLSearchParams(raw);
+  const next = {};
+  const view = params.get("view");
+  if (view) next.view = view;
+  const selectedCandidateId = params.get("selected");
+  if (selectedCandidateId) next.selectedCandidateId = selectedCandidateId;
+  const callCandidateId = params.get("call");
+  if (callCandidateId) next.callCandidateId = callCandidateId;
+  const pipelineSearch = params.get("pipelineSearch");
+  if (pipelineSearch) next.pipelineSearch = pipelineSearch;
+  const followFilter = params.get("followFilter");
+  if (followFilter) next.followFilter = followFilter;
+  const filters = {};
+  ["search", "state", "status", "work"].forEach((key) => {
+    const value = params.get(key);
+    if (value) filters[key] = value;
+  });
+  if (Object.keys(filters).length) next.filters = filters;
+  return next;
+}
+
+function writeUiToHash(ui) {
+  if (typeof window === "undefined") return;
+  const params = new globalThis.URLSearchParams();
+  if (ui.view && ui.view !== "dashboard") params.set("view", ui.view);
+  if (ui.selectedCandidateId) params.set("selected", ui.selectedCandidateId);
+  if (ui.callCandidateId) params.set("call", ui.callCandidateId);
+  if (ui.pipelineSearch) params.set("pipelineSearch", ui.pipelineSearch);
+  if (ui.followFilter && ui.followFilter !== "open") params.set("followFilter", ui.followFilter);
+  Object.entries(ui.filters || {}).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+  const nextHash = params.toString() ? `#/${params.toString()}` : "";
+  if (window.location.hash !== nextHash) {
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${nextHash}`);
+  }
+}
+
 function statusLabel(status, t) {
   return t(`status_${status}`) || statusMap[status] || status;
 }
@@ -1069,13 +1110,17 @@ export default function RecruitingHub() {
   const [authLoading, setAuthLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [db, setDb] = useState({ settings: defaultSettings, candidates: [], followups: [], activities: [], knowledge: [] });
-  const [ui, setUi] = useState({
-    view: "dashboard",
-    selectedCandidateId: null,
-    callCandidateId: null,
-    filters: { search: "", state: "", status: "", work: "" },
-    pipelineSearch: "",
-    followFilter: "open"
+  const [ui, setUi] = useState(() => {
+    const hashUi = readUiFromHash();
+    return {
+      view: "dashboard",
+      selectedCandidateId: null,
+      callCandidateId: null,
+      pipelineSearch: "",
+      followFilter: "open",
+      ...hashUi,
+      filters: { search: "", state: "", status: "", work: "", ...(hashUi.filters || {}) }
+    };
   });
   const [toast, setToast] = useState("");
   const [modal, setModal] = useState(null);
@@ -1107,6 +1152,10 @@ export default function RecruitingHub() {
       setDb({ settings: defaultSettings, candidates: [], followups: [], activities: [], knowledge: [] });
     }
   }, [session]);
+
+  useEffect(() => {
+    writeUiToHash(ui);
+  }, [ui]);
 
   async function ensureWorkspace() {
     if (!session?.user?.id) throw new Error("Нет активной Supabase-сессии");
