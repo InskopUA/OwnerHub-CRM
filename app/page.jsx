@@ -185,7 +185,7 @@ const interfaceCopy = {
     quoSigningSecretNote: "В Quo откройте webhook details → Reveal signing secret и вставьте base64 secret сюда.",
     saveQuoSecret: "Save signing secret",
     quoEvents: "Events to enable",
-    quoEventsNote: "В Quo выберите call.completed, call.summary.completed, call.recording.completed и message.received. Система привяжет звонок, summary, запись и фото документов к кандидату.",
+    quoEventsNote: "В Quo выберите call.ringing, call.completed, call.summary.completed, call.recording.completed и message.received. Система привяжет live-звонки, summary, запись и фото документов к кандидату.",
     copyWebhookUrl: "Copy webhook URL",
     welcomeSms: "Welcome SMS",
     welcomeSmsNote: "Автоматически отправлять SMS новым лидам, которые приходят через Make.",
@@ -201,6 +201,12 @@ const interfaceCopy = {
     welcomeSmsGuideSender: "В Quo docs откройте Phone Numbers → List phone numbers, нажмите Send и скопируйте id нужного номера. ID начинается с PN.",
     welcomeSmsGuideSave: "Вставьте PN... в Quo sender, включите Send welcome SMS to new leads и нажмите Save.",
     welcomeSmsGuideTest: "Для теста создайте новый лид через Make. SMS отправляется только новым лидам, не обновлениям существующих.",
+    callInProgress: "Входящий звонок",
+    callInProgressWith: "Входящий звонок от {{name}}",
+    unknownIncomingCall: "Входящий звонок с {{phone}}",
+    openProfile: "Открыть профиль",
+    openScript: "Открыть скрипт",
+    addCandidateFromCall: "Добавить кандидата",
     close: "Закрыть",
     done: "Готово",
     cancel: "Отмена",
@@ -463,7 +469,7 @@ const interfaceCopy = {
     quoSigningSecretNote: "In Quo, open webhook details → Reveal signing secret and paste the base64 secret here.",
     saveQuoSecret: "Save signing secret",
     quoEvents: "Events to enable",
-    quoEventsNote: "In Quo, select call.completed, call.summary.completed, call.recording.completed, and message.received. The system links calls, summaries, recordings, and document photos to the candidate.",
+    quoEventsNote: "In Quo, select call.ringing, call.completed, call.summary.completed, call.recording.completed, and message.received. The system links live calls, summaries, recordings, and document photos to the candidate.",
     copyWebhookUrl: "Copy webhook URL",
     welcomeSms: "Welcome SMS",
     welcomeSmsNote: "Automatically send an SMS to new leads that arrive through Make.",
@@ -479,6 +485,12 @@ const interfaceCopy = {
     welcomeSmsGuideSender: "In Quo docs, open Phone Numbers → List phone numbers, click Send, and copy the id for the sending number. The id starts with PN.",
     welcomeSmsGuideSave: "Paste PN... into Quo sender, enable Send welcome SMS to new leads, and click Save.",
     welcomeSmsGuideTest: "To test, create a new lead through Make. SMS is sent only to new leads, not existing lead updates.",
+    callInProgress: "Incoming call",
+    callInProgressWith: "Incoming call from {{name}}",
+    unknownIncomingCall: "Incoming call from {{phone}}",
+    openProfile: "Open profile",
+    openScript: "Open script",
+    addCandidateFromCall: "Add candidate",
     close: "Close",
     done: "Done",
     cancel: "Cancel",
@@ -1086,6 +1098,27 @@ function mapCandidateAttachment(row) {
   };
 }
 
+function mapQuoLiveCall(row) {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    candidateId: row.candidate_id,
+    callId: row.call_id || "",
+    eventType: row.event_type || "",
+    fromNumber: row.from_number || "",
+    toNumber: row.to_number || "",
+    direction: row.direction || "",
+    status: row.status || "ringing",
+    conversationId: row.conversation_id || "",
+    phoneNumberId: row.phone_number_id || "",
+    startedAt: row.started_at || "",
+    answeredAt: row.answered_at || "",
+    completedAt: row.completed_at || "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
 function splitCandidateNotes(notes = "") {
   const text = String(notes || "");
   const marker = /(?:^|\n{2,})Quo call summary - /g;
@@ -1357,6 +1390,7 @@ export default function RecruitingHub() {
   const [loading, setLoading] = useState(false);
   const emptyDb = { settings: defaultSettings, candidates: [], followups: [], activities: [], knowledge: [], quoCalls: [], attachments: [] };
   const [db, setDb] = useState(emptyDb);
+  const [liveCalls, setLiveCalls] = useState([]);
   const [ui, setUi] = useState(() => {
     const hashUi = readUiFromHash();
     return {
@@ -1397,8 +1431,16 @@ export default function RecruitingHub() {
     else {
       setWorkspace(null);
       setDb(emptyDb);
+      setLiveCalls([]);
     }
   }, [session]);
+
+  useEffect(() => {
+    if (!workspace?.id || !session) return undefined;
+    loadLiveCalls();
+    const timer = globalThis.setInterval(loadLiveCalls, 5000);
+    return () => globalThis.clearInterval(timer);
+  }, [workspace?.id, session]);
 
   useEffect(() => {
     writeUiToHash(ui);
@@ -1577,6 +1619,25 @@ export default function RecruitingHub() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadLiveCalls() {
+    if (!workspace?.id) return;
+    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from("quo_live_calls")
+      .select("*")
+      .eq("workspace_id", workspace.id)
+      .in("status", ["ringing", "answered"])
+      .gte("updated_at", fourHoursAgo)
+      .order("updated_at", { ascending: false })
+      .limit(5);
+    if (error?.code === "42P01") {
+      setLiveCalls([]);
+      return;
+    }
+    if (error) return;
+    setLiveCalls((data || []).map(mapQuoLiveCall));
   }
 
   async function addActivity(candidateId, text, type = "note") {
@@ -2078,6 +2139,7 @@ export default function RecruitingHub() {
   if (!session) return <AuthScreen />;
 
   const title = titleForView(ui.view, t);
+  const activeLiveCall = liveCalls.find((call) => call.direction === "incoming" || !call.direction) || null;
 
   return (
     <I18nContext.Provider value={{ lang: interfaceLanguage, t }}>
@@ -2124,6 +2186,13 @@ export default function RecruitingHub() {
             <button className="btn btn-primary" onClick={() => setModal({ type: "candidate", candidate: blankCandidate() })}>＋ {t("newCandidate")}</button>
           </div>
         </header>
+        <LiveCallBanner
+          call={activeLiveCall}
+          candidates={db.candidates}
+          openCandidate={(candidateId) => setUi((current) => ({ ...current, view: "candidate", selectedCandidateId: candidateId }))}
+          openScript={(candidateId) => setUi((current) => ({ ...current, view: "calls", callCandidateId: candidateId }))}
+          addCandidate={(phone) => setModal({ type: "candidate", candidate: { ...blankCandidate(), phone, source: "Quo Incoming Call" }, startCallAfter: false })}
+        />
         <section className="content">
           {loading ? <ShellLoading label={t("loadingData")} compact /> : null}
           {ui.view === "dashboard" && (
@@ -2324,6 +2393,34 @@ function titleForView(view, t) {
     analytics: [t("analytics"), t("pageAnalyticsSubtitle")],
     settings: [t("settings"), t("pageSettingsSubtitle")]
   }[view] || ["OwnerHub HRM", ""];
+}
+
+function LiveCallBanner({ call, candidates, openCandidate, openScript, addCandidate }) {
+  const { t } = useI18n();
+  if (!call) return null;
+
+  const candidate = candidates.find((item) => item.id === call.candidateId);
+  const phone = call.direction === "outgoing" ? call.toNumber : call.fromNumber;
+
+  return (
+    <div className="live-call-banner">
+      <div className="live-call-pulse" />
+      <div className="live-call-copy">
+        <strong>{candidate ? t("callInProgressWith", { name: fullName(candidate) }) : t("unknownIncomingCall", { phone: phone || t("notSpecified") })}</strong>
+        <span>{[phone, call.status].filter(Boolean).join(" · ")}</span>
+      </div>
+      <div className="live-call-actions">
+        {candidate ? (
+          <>
+            <button className="btn btn-small" onClick={() => openCandidate(candidate.id)}>{t("openProfile")}</button>
+            <button className="btn btn-small btn-primary" onClick={() => openScript(candidate.id)}>{t("openScript")}</button>
+          </>
+        ) : (
+          <button className="btn btn-small btn-primary" onClick={() => addCandidate(phone)}>{t("addCandidateFromCall")}</button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function SetupScreen() {
@@ -3651,6 +3748,7 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
         <div className="settings-row">
           <div className="settings-copy"><strong>{t("quoEvents")}</strong><p>{t("quoEventsNote")}</p></div>
           <div className="token-list">
+            <div className="token-row"><div><strong>call.ringing</strong><span>Show live incoming call banner</span></div><span className="badge badge-green">required</span></div>
             <div className="token-row"><div><strong>call.completed</strong><span>Match phone number to candidate</span></div><span className="badge badge-green">required</span></div>
             <div className="token-row"><div><strong>call.summary.completed</strong><span>Import summary and next steps</span></div><span className="badge badge-green">required</span></div>
             <div className="token-row"><div><strong>call.recording.completed</strong><span>Link call recording URL</span></div><span className="badge badge-green">required</span></div>

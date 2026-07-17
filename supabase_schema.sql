@@ -351,6 +351,28 @@ create table if not exists public.quo_call_events (
   unique (workspace_id, call_id)
 );
 
+create table if not exists public.quo_live_calls (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  candidate_id text references public.candidates(id) on delete set null,
+  call_id text not null,
+  event_id text not null default '',
+  event_type text not null default '',
+  from_number text not null default '',
+  to_number text not null default '',
+  direction text not null default '',
+  status text not null default 'ringing',
+  conversation_id text not null default '',
+  phone_number_id text not null default '',
+  started_at timestamptz,
+  answered_at timestamptz,
+  completed_at timestamptz,
+  raw_payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (workspace_id, call_id)
+);
+
 alter table public.app_settings add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.app_settings add column if not exists offer_profile jsonb not null default '{}'::jsonb;
 alter table public.app_settings add column if not exists quo_api_key text not null default '';
@@ -392,6 +414,21 @@ alter table public.quo_call_events add column if not exists recording_type text 
 alter table public.quo_call_events add column if not exists recording_duration_seconds integer;
 alter table public.quo_call_events add column if not exists recording_storage_path text not null default '';
 alter table public.quo_call_events add column if not exists recording_imported_at timestamptz;
+alter table public.quo_live_calls add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
+alter table public.quo_live_calls add column if not exists candidate_id text references public.candidates(id) on delete set null;
+alter table public.quo_live_calls add column if not exists call_id text not null default '';
+alter table public.quo_live_calls add column if not exists event_id text not null default '';
+alter table public.quo_live_calls add column if not exists event_type text not null default '';
+alter table public.quo_live_calls add column if not exists from_number text not null default '';
+alter table public.quo_live_calls add column if not exists to_number text not null default '';
+alter table public.quo_live_calls add column if not exists direction text not null default '';
+alter table public.quo_live_calls add column if not exists status text not null default 'ringing';
+alter table public.quo_live_calls add column if not exists conversation_id text not null default '';
+alter table public.quo_live_calls add column if not exists phone_number_id text not null default '';
+alter table public.quo_live_calls add column if not exists started_at timestamptz;
+alter table public.quo_live_calls add column if not exists answered_at timestamptz;
+alter table public.quo_live_calls add column if not exists completed_at timestamptz;
+alter table public.quo_live_calls add column if not exists raw_payload jsonb not null default '{}'::jsonb;
 
 create unique index if not exists idx_app_settings_workspace_id_unique on public.app_settings(workspace_id);
 create index if not exists idx_workspace_webhook_tokens_workspace_id on public.workspace_webhook_tokens(workspace_id);
@@ -423,6 +460,9 @@ create index if not exists idx_call_knowledge_items_category on public.call_know
 create index if not exists idx_quo_call_events_workspace_id on public.quo_call_events(workspace_id);
 create index if not exists idx_quo_call_events_call_id on public.quo_call_events(workspace_id, call_id);
 create index if not exists idx_quo_call_events_candidate_id on public.quo_call_events(candidate_id);
+create index if not exists idx_quo_live_calls_workspace_status on public.quo_live_calls(workspace_id, status, updated_at desc);
+create index if not exists idx_quo_live_calls_call_id on public.quo_live_calls(workspace_id, call_id);
+create index if not exists idx_quo_live_calls_candidate_id on public.quo_live_calls(candidate_id);
 
 create or replace function public.create_candidate_defaults()
 returns trigger
@@ -534,6 +574,11 @@ create trigger set_updated_at_quo_call_events
 before update on public.quo_call_events
 for each row execute function public.set_updated_at();
 
+drop trigger if exists set_updated_at_quo_live_calls on public.quo_live_calls;
+create trigger set_updated_at_quo_live_calls
+before update on public.quo_live_calls
+for each row execute function public.set_updated_at();
+
 alter table public.workspaces enable row level security;
 alter table public.app_settings enable row level security;
 alter table public.workspace_webhook_tokens enable row level security;
@@ -549,6 +594,7 @@ alter table public.candidate_attachments enable row level security;
 alter table public.followups enable row level security;
 alter table public.activities enable row level security;
 alter table public.quo_call_events enable row level security;
+alter table public.quo_live_calls enable row level security;
 
 drop policy if exists "authenticated all workspaces" on public.workspaces;
 create policy "authenticated all workspaces"
@@ -826,6 +872,25 @@ with check (
   exists (
     select 1 from public.workspaces w
     where w.id = quo_call_events.workspace_id
+      and w.owner_user_id = auth.uid()
+  )
+);
+
+drop policy if exists "authenticated all quo live calls" on public.quo_live_calls;
+create policy "authenticated all quo live calls"
+on public.quo_live_calls for all
+to authenticated
+using (
+  exists (
+    select 1 from public.workspaces w
+    where w.id = quo_live_calls.workspace_id
+      and w.owner_user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1 from public.workspaces w
+    where w.id = quo_live_calls.workspace_id
       and w.owner_user_id = auth.uid()
   )
 );

@@ -141,6 +141,12 @@ async function insertActivity(workspaceId, candidateId, text, type = "call") {
   if (error) throw error;
 }
 
+const ignoreMissingTable = (error) => {
+  if (error?.code === "42P01") return true;
+  if (error) throw error;
+  return false;
+};
+
 function extractMessageMedia(object) {
   return [
     ...arrayFrom(object?.media),
@@ -281,6 +287,51 @@ async function applyRecordingToCandidate(workspaceId, callId) {
   return { imported: true, candidateId: event.candidate_id };
 }
 
+async function closeLiveCall(workspaceId, callId, status = "completed", completedAt = new Date().toISOString()) {
+  if (!callId) return;
+  const { error } = await supabaseAdmin
+    .from("quo_live_calls")
+    .update({ status, completed_at: completedAt })
+    .eq("workspace_id", workspaceId)
+    .eq("call_id", callId);
+  ignoreMissingTable(error);
+}
+
+async function handleCallRinging(workspaceId, eventId, body, object) {
+  const callId = object?.id || object?.callId || "";
+  if (!callId) return { ok: true, ignored: true, reason: "Missing call id" };
+
+  const direction = object?.direction || "incoming";
+  const fromNumber = firstText(object?.from, object?.fromNumber, object?.from_number);
+  const toNumber = firstText(object?.to, object?.toNumber, object?.to_number);
+  const candidatePhone = direction === "outgoing" ? toNumber : fromNumber;
+  const candidate = await findCandidateByPhone(workspaceId, [candidatePhone, fromNumber, toNumber]);
+  const startedAt = safeDate(object?.createdAt || object?.startedAt || object?.ringingAt) || new Date().toISOString();
+
+  const row = {
+    workspace_id: workspaceId,
+    candidate_id: candidate?.id || null,
+    call_id: callId,
+    event_id: eventId || "",
+    event_type: body?.type || "call.ringing",
+    from_number: fromNumber,
+    to_number: toNumber,
+    direction,
+    status: "ringing",
+    conversation_id: object?.conversationId || "",
+    phone_number_id: object?.phoneNumberId || "",
+    started_at: startedAt,
+    raw_payload: body
+  };
+
+  const { error } = await supabaseAdmin
+    .from("quo_live_calls")
+    .upsert(row, { onConflict: "workspace_id,call_id" });
+  if (error) throw error;
+
+  return { ok: true, callId, matched: Boolean(candidate?.id), candidateId: candidate?.id || null };
+}
+
 async function handleCallCompleted(workspaceId, eventId, body, object) {
   const callId = object?.id || object?.callId || "";
   if (!callId) return { ok: true, ignored: true, reason: "Missing call id" };
@@ -324,6 +375,7 @@ async function handleCallCompleted(workspaceId, eventId, body, object) {
 
   const summaryResult = await applySummaryToCandidate(workspaceId, callId);
   const recordingResult = await applyRecordingToCandidate(workspaceId, callId);
+  await closeLiveCall(workspaceId, callId, "completed", safeDate(object?.completedAt || object?.createdAt) || new Date().toISOString());
   return { ok: true, callId, matched: Boolean(candidate?.id), candidateId: candidate?.id || null, summaryImported: summaryResult.imported, recordingLinked: recordingResult.imported };
 }
 
@@ -465,7 +517,9 @@ export async function POST(request) {
 
     const object = body?.data?.object || body?.object || {};
     let result;
-    if (body?.type === "call.completed") {
+    if (body?.type === "call.ringing") {
+      result = await handleCallRinging(webhook.workspace_id, body?.id, body, object);
+    } else if (body?.type === "call.completed") {
       result = await handleCallCompleted(webhook.workspace_id, body?.id, body, object);
     } else if (body?.type === "call.summary.completed") {
       result = await handleSummaryCompleted(webhook.workspace_id, body?.id, body, object);
