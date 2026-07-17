@@ -18,6 +18,10 @@ const defaultSettings = {
   hrName: "HR Manager",
   interfaceLanguage: "ru",
   defaultScriptLanguage: "ru",
+  quoApiKey: "",
+  quoSmsFrom: "",
+  welcomeSmsEnabled: false,
+  welcomeSmsTemplate: "Hello {{firstName}}, thank you for your application. We received your request, and our HR manager will contact you shortly.",
   offerProfile: {
     targetRole: "Owner-Operator with open 2-car trailer",
     equipment: "Own truck and open two-car trailer",
@@ -183,6 +187,15 @@ const interfaceCopy = {
     quoEvents: "Events to enable",
     quoEventsNote: "В Quo выберите call.completed, call.summary.completed, call.recording.completed и message.received. Система привяжет звонок, summary, запись и фото документов к кандидату.",
     copyWebhookUrl: "Copy webhook URL",
+    welcomeSms: "Welcome SMS",
+    welcomeSmsNote: "Автоматически отправлять SMS новым лидам, которые приходят через Make.",
+    sendWelcomeSms: "Отправлять welcome SMS новым лидам",
+    quoApiKey: "Quo API key",
+    quoApiKeyNote: "Нужен для отправки SMS через Quo. Вставьте API key из Quo.",
+    quoSmsFrom: "Quo sender",
+    quoSmsFromNote: "Укажите Quo phone number ID вида PN... Его можно получить через Quo API phone-numbers или в настройках номера.",
+    welcomeSmsTemplate: "Текст welcome SMS",
+    welcomeSmsTemplateNote: "Можно использовать {{firstName}}, {{lastName}}, {{fullName}}, {{companyName}}, {{hrName}}.",
     close: "Закрыть",
     done: "Готово",
     cancel: "Отмена",
@@ -447,6 +460,15 @@ const interfaceCopy = {
     quoEvents: "Events to enable",
     quoEventsNote: "In Quo, select call.completed, call.summary.completed, call.recording.completed, and message.received. The system links calls, summaries, recordings, and document photos to the candidate.",
     copyWebhookUrl: "Copy webhook URL",
+    welcomeSms: "Welcome SMS",
+    welcomeSmsNote: "Automatically send an SMS to new leads that arrive through Make.",
+    sendWelcomeSms: "Send welcome SMS to new leads",
+    quoApiKey: "Quo API key",
+    quoApiKeyNote: "Required to send SMS through Quo. Paste your API key from Quo.",
+    quoSmsFrom: "Quo sender",
+    quoSmsFromNote: "Enter the Quo phone number ID in PN... format. You can get it from Quo API phone-numbers or number settings.",
+    welcomeSmsTemplate: "Welcome SMS text",
+    welcomeSmsTemplateNote: "You can use {{firstName}}, {{lastName}}, {{fullName}}, {{companyName}}, {{hrName}}.",
     close: "Close",
     done: "Done",
     cancel: "Cancel",
@@ -1419,12 +1441,23 @@ export default function RecruitingHub() {
           hub_name: defaultSettings.hubName,
           hr_name: defaultSettings.hrName,
           default_script_language: defaultSettings.defaultScriptLanguage,
-          offer_profile: defaultSettings.offerProfile
+          offer_profile: defaultSettings.offerProfile,
+          quo_api_key: defaultSettings.quoApiKey,
+          quo_sms_from: defaultSettings.quoSmsFrom,
+          welcome_sms_enabled: defaultSettings.welcomeSmsEnabled,
+          welcome_sms_template: defaultSettings.welcomeSmsTemplate
         };
         let insertedSettings = await supabase.from("app_settings").insert(settingsPayload);
         if (insertedSettings.error?.code === "42703") {
-          delete settingsPayload.offer_profile;
+          delete settingsPayload.quo_api_key;
+          delete settingsPayload.quo_sms_from;
+          delete settingsPayload.welcome_sms_enabled;
+          delete settingsPayload.welcome_sms_template;
           insertedSettings = await supabase.from("app_settings").insert(settingsPayload);
+          if (insertedSettings.error?.code === "42703") {
+            delete settingsPayload.offer_profile;
+            insertedSettings = await supabase.from("app_settings").insert(settingsPayload);
+          }
         }
         if (insertedSettings.error) throw insertedSettings.error;
       }
@@ -1507,6 +1540,10 @@ export default function RecruitingHub() {
               hrName: settingsRow.hr_name,
               interfaceLanguage: settingsRow.offer_profile?.__interfaceLanguage || defaultSettings.interfaceLanguage,
               defaultScriptLanguage: settingsRow.default_script_language,
+              quoApiKey: settingsRow.quo_api_key || "",
+              quoSmsFrom: settingsRow.quo_sms_from || "",
+              welcomeSmsEnabled: Boolean(settingsRow.welcome_sms_enabled),
+              welcomeSmsTemplate: settingsRow.welcome_sms_template || defaultSettings.welcomeSmsTemplate,
               offerProfile: mergeOfferProfile(settingsRow.offer_profile)
             }
           : defaultSettings,
@@ -1984,6 +2021,10 @@ export default function RecruitingHub() {
       hub_name: settings.hubName || defaultSettings.hubName,
       hr_name: settings.hrName || defaultSettings.hrName,
       default_script_language: settings.defaultScriptLanguage || "ru",
+      quo_api_key: settings.quoApiKey || "",
+      quo_sms_from: settings.quoSmsFrom || "",
+      welcome_sms_enabled: Boolean(settings.welcomeSmsEnabled),
+      welcome_sms_template: settings.welcomeSmsTemplate || defaultSettings.welcomeSmsTemplate,
       offer_profile: {
         ...mergeOfferProfile(settings.offerProfile),
         __interfaceLanguage: settings.interfaceLanguage || defaultSettings.interfaceLanguage
@@ -1991,8 +2032,15 @@ export default function RecruitingHub() {
     };
     let { error } = await supabase.from("app_settings").upsert(settingsPayload);
     if (error?.code === "42703") {
-      delete settingsPayload.offer_profile;
+      delete settingsPayload.quo_api_key;
+      delete settingsPayload.quo_sms_from;
+      delete settingsPayload.welcome_sms_enabled;
+      delete settingsPayload.welcome_sms_template;
       ({ error } = await supabase.from("app_settings").upsert(settingsPayload));
+      if (error?.code === "42703") {
+        delete settingsPayload.offer_profile;
+        ({ error } = await supabase.from("app_settings").upsert(settingsPayload));
+      }
     }
     if (error) {
       notify(error.message);
@@ -3564,6 +3612,22 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
             <div className="token-row"><div><strong>call.recording.completed</strong><span>Link call recording URL</span></div><span className="badge badge-green">required</span></div>
             <div className="token-row"><div><strong>message.received</strong><span>Link incoming document photos</span></div><span className="badge badge-green">required</span></div>
           </div>
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><strong>{t("welcomeSms")}</strong><p>{t("welcomeSmsNote")}</p></div>
+          <label className="toggle-row"><input type="checkbox" checked={Boolean(settings.welcomeSmsEnabled)} onChange={(event) => setSettings({ ...settings, welcomeSmsEnabled: event.target.checked })} /> <span>{t("sendWelcomeSms")}</span></label>
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><strong>{t("quoApiKey")}</strong><p>{t("quoApiKeyNote")}</p></div>
+          <input type="password" value={settings.quoApiKey || ""} onChange={(event) => setSettings({ ...settings, quoApiKey: event.target.value })} placeholder="Quo API key" />
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><strong>{t("quoSmsFrom")}</strong><p>{t("quoSmsFromNote")}</p></div>
+          <input value={settings.quoSmsFrom || ""} onChange={(event) => setSettings({ ...settings, quoSmsFrom: event.target.value })} placeholder="PN..." />
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><strong>{t("welcomeSmsTemplate")}</strong><p>{t("welcomeSmsTemplateNote")}</p></div>
+          <textarea value={settings.welcomeSmsTemplate || ""} onChange={(event) => setSettings({ ...settings, welcomeSmsTemplate: event.target.value })} />
         </div>
       </div>
 

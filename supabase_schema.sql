@@ -100,6 +100,10 @@ create table if not exists public.app_settings (
   hr_name text not null default 'HR Manager',
   default_script_language text not null default 'ru',
   offer_profile jsonb not null default '{}'::jsonb,
+  quo_api_key text not null default '',
+  quo_sms_from text not null default '',
+  welcome_sms_enabled boolean not null default false,
+  welcome_sms_template text not null default 'Hello {{firstName}}, thank you for your application. We received your request, and our HR manager will contact you shortly.',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -349,6 +353,10 @@ create table if not exists public.quo_call_events (
 
 alter table public.app_settings add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.app_settings add column if not exists offer_profile jsonb not null default '{}'::jsonb;
+alter table public.app_settings add column if not exists quo_api_key text not null default '';
+alter table public.app_settings add column if not exists quo_sms_from text not null default '';
+alter table public.app_settings add column if not exists welcome_sms_enabled boolean not null default false;
+alter table public.app_settings add column if not exists welcome_sms_template text not null default 'Hello {{firstName}}, thank you for your application. We received your request, and our HR manager will contact you shortly.';
 alter table public.workspace_webhook_tokens add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.workspace_webhook_tokens add column if not exists token_value text not null default '';
 alter table public.workspace_quo_webhooks add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;

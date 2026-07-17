@@ -423,6 +423,78 @@ const todayISO = () => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 };
 
+const normalizePhoneForSms = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  if (raw.startsWith("+")) return `+${digits}`;
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return `+${digits}`;
+};
+
+const renderTemplate = (template, candidate, settings) =>
+  String(template || "")
+    .replaceAll("{{firstName}}", candidate.first_name || "there")
+    .replaceAll("{{lastName}}", candidate.last_name || "")
+    .replaceAll("{{fullName}}", [candidate.first_name, candidate.last_name].filter(Boolean).join(" ") || "there")
+    .replaceAll("{{companyName}}", settings.company_name || "our company")
+    .replaceAll("{{hrName}}", settings.hr_name || "HR manager");
+
+async function insertActivity(workspaceId, candidateId, text, type = "note") {
+  const activityId = `act_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const { error } = await supabaseAdmin.from("activities").insert({
+    id: activityId,
+    workspace_id: workspaceId,
+    candidate_id: candidateId,
+    type,
+    text
+  });
+  if (error) throw error;
+}
+
+async function sendWelcomeSms(workspaceId, candidateId, candidate) {
+  const { data: settings, error } = await supabaseAdmin
+    .from("app_settings")
+    .select("company_name, hr_name, quo_api_key, quo_sms_from, welcome_sms_enabled, welcome_sms_template")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (error) throw error;
+
+  if (!settings?.welcome_sms_enabled) return { sent: false, reason: "disabled" };
+  if (!settings.quo_api_key || !settings.quo_sms_from) return { sent: false, reason: "missing_quo_settings" };
+
+  const to = normalizePhoneForSms(candidate.phone);
+  if (!to) return { sent: false, reason: "missing_phone" };
+
+  const content = renderTemplate(settings.welcome_sms_template, candidate, settings).trim();
+  if (!content) return { sent: false, reason: "empty_template" };
+
+  const response = await globalThis.fetch("https://api.openphone.com/v1/messages", {
+    method: "POST",
+    headers: {
+      Authorization: settings.quo_api_key,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      content,
+      from: settings.quo_sms_from,
+      to: [to]
+    })
+  });
+
+  const responseBody = await response.text();
+  if (!response.ok) {
+    const message = responseBody.slice(0, 500) || `HTTP ${response.status}`;
+    await insertActivity(workspaceId, candidateId, `Welcome SMS failed: ${message}`, "sms");
+    return { sent: false, reason: "quo_error", status: response.status };
+  }
+
+  await insertActivity(workspaceId, candidateId, "Welcome SMS sent via Quo", "sms");
+  return { sent: true };
+}
+
 async function createNewLeadFollowup(workspaceId, candidateId) {
   const today = todayISO();
   const { data: existing, error: existingError } = await supabaseAdmin
@@ -456,15 +528,7 @@ async function createNewLeadFollowup(workspaceId, candidateId) {
     .eq("workspace_id", workspaceId);
   if (candidateError) throw candidateError;
 
-  const activityId = `act_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-  const { error: activityError } = await supabaseAdmin.from("activities").insert({
-    id: activityId,
-    workspace_id: workspaceId,
-    candidate_id: candidateId,
-    type: "followup",
-    text: "Auto follow-up created: call new lead today"
-  });
-  if (activityError) throw activityError;
+  await insertActivity(workspaceId, candidateId, "Auto follow-up created: call new lead today", "followup");
 }
 
 export async function POST(request) {
@@ -516,21 +580,15 @@ export async function POST(request) {
       if (error) throw error;
     }
 
-    const activityId = `act_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-    const { error: activityError } = await supabaseAdmin.from("activities").insert({
-      id: activityId,
-      workspace_id: workspaceId,
-      candidate_id: candidateId,
-      type: "lead",
-      text: `Lead ${action} from Make`
-    });
-    if (activityError) throw activityError;
+    await insertActivity(workspaceId, candidateId, `Lead ${action} from Make`, "lead");
 
+    let welcomeSms = { sent: false, reason: "not_new_lead" };
     if (action === "created") {
       await createNewLeadFollowup(workspaceId, candidateId);
+      welcomeSms = await sendWelcomeSms(workspaceId, candidateId, lead);
     }
 
-    return NextResponse.json({ ok: true, action, candidate_id: candidateId, workspace_id: workspaceId });
+    return NextResponse.json({ ok: true, action, candidate_id: candidateId, workspace_id: workspaceId, welcome_sms: welcomeSms });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error.message || "Unknown error" }, { status: 400 });
   }
