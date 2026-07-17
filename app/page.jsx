@@ -154,6 +154,17 @@ const interfaceCopy = {
     tokenStatus: "Token status",
     tokenStatusNote: "В системе должен быть только один активный token. Новый token автоматически заменяет старый.",
     noTokens: "Токены ещё не созданы.",
+    quoIntegration: "Quo Integration",
+    quoWebhookUrl: "Quo Webhook URL",
+    quoWebhookUrlNote: "Этот URL вставляется в Quo Settings → Webhooks.",
+    quoTokenNote: "Новый Quo token заменяет старый. Используйте только текущий URL в Quo.",
+    generateQuoWebhook: "Generate Quo webhook",
+    quoSigningSecret: "Quo signing secret",
+    quoSigningSecretNote: "В Quo откройте webhook details → Reveal signing secret и вставьте base64 secret сюда.",
+    saveQuoSecret: "Save signing secret",
+    quoEvents: "Events to enable",
+    quoEventsNote: "В Quo выберите call.completed и call.summary.completed. Первый ищет кандидата по телефону, второй импортирует summary.",
+    copyWebhookUrl: "Copy webhook URL",
     close: "Закрыть",
     done: "Готово",
     cancel: "Отмена",
@@ -361,6 +372,17 @@ const interfaceCopy = {
     tokenStatus: "Token status",
     tokenStatusNote: "There should be only one active token. A new token automatically replaces the old one.",
     noTokens: "No tokens created yet.",
+    quoIntegration: "Quo Integration",
+    quoWebhookUrl: "Quo Webhook URL",
+    quoWebhookUrlNote: "Paste this URL into Quo Settings → Webhooks.",
+    quoTokenNote: "A new Quo token replaces the old one. Use only the current URL in Quo.",
+    generateQuoWebhook: "Generate Quo webhook",
+    quoSigningSecret: "Quo signing secret",
+    quoSigningSecretNote: "In Quo, open webhook details → Reveal signing secret and paste the base64 secret here.",
+    saveQuoSecret: "Save signing secret",
+    quoEvents: "Events to enable",
+    quoEventsNote: "In Quo, select call.completed and call.summary.completed. The first matches the candidate by phone; the second imports the summary.",
+    copyWebhookUrl: "Copy webhook URL",
     close: "Close",
     done: "Done",
     cancel: "Cancel",
@@ -2571,12 +2593,18 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
   const { t } = useI18n();
   const [settings, setSettings] = useState(db.settings);
   const [tokens, setTokens] = useState([]);
+  const [quoWebhook, setQuoWebhook] = useState(null);
+  const [quoSigningSecret, setQuoSigningSecret] = useState("");
+  const [generatedQuoToken, setGeneratedQuoToken] = useState("");
   const [generatedToken, setGeneratedToken] = useState("");
   const [showGuide, setShowGuide] = useState(false);
   const [busy, setBusy] = useState(false);
   const webhookUrl = typeof window === "undefined" ? "/api/make/leads" : `${window.location.origin}/api/make/leads`;
+  const quoWebhookBaseUrl = typeof window === "undefined" ? "/api/quo/webhooks" : `${window.location.origin}/api/quo/webhooks`;
   const currentToken = tokens.find((token) => token.active) || tokens[0] || null;
   const visibleToken = currentToken?.token_value || generatedToken || "";
+  const visibleQuoToken = quoWebhook?.token_value || generatedQuoToken || "";
+  const quoWebhookUrl = visibleQuoToken ? `${quoWebhookBaseUrl}?token=${encodeURIComponent(visibleQuoToken)}` : quoWebhookBaseUrl;
 
   useEffect(() => {
     setSettings(db.settings);
@@ -2585,6 +2613,7 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
   useEffect(() => {
     if (!workspace?.id) return;
     loadTokens();
+    loadQuoWebhook();
   }, [workspace?.id]);
 
   async function hashToken(token) {
@@ -2611,6 +2640,21 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
     }
 
     if (!error) setTokens(data || []);
+  }
+
+  async function loadQuoWebhook() {
+    const { data, error } = await supabase
+      .from("workspace_quo_webhooks")
+      .select("id, label, token_value, token_preview, signing_secret, active, created_at, last_used_at")
+      .eq("workspace_id", workspace.id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (!error) {
+      const current = data?.[0] || null;
+      setQuoWebhook(current);
+      setQuoSigningSecret(current?.signing_secret || "");
+    }
   }
 
   async function copyToken(token) {
@@ -2650,6 +2694,55 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
       setGeneratedToken(token);
       await loadTokens();
       setShowGuide(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function generateQuoWebhook() {
+    if (!workspace?.id) return;
+    setBusy(true);
+    try {
+      const raw = new Uint8Array(32);
+      crypto.getRandomValues(raw);
+      const token = `ohquo_${Array.from(raw).map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+      const tokenHash = await hashToken(token);
+      const preview = `${token.slice(0, 11)}...${token.slice(-6)}`;
+
+      const deleted = await supabase
+        .from("workspace_quo_webhooks")
+        .delete()
+        .eq("workspace_id", workspace.id);
+      if (deleted.error) throw deleted.error;
+
+      const { error } = await supabase.from("workspace_quo_webhooks").insert({
+        workspace_id: workspace.id,
+        label: "Quo",
+        token_value: token,
+        token_hash: tokenHash,
+        token_preview: preview,
+        signing_secret: quoSigningSecret.trim(),
+        active: true
+      });
+      if (error) throw error;
+      setGeneratedQuoToken(token);
+      await loadQuoWebhook();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveQuoSecret() {
+    if (!workspace?.id || !quoWebhook?.id) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase
+        .from("workspace_quo_webhooks")
+        .update({ signing_secret: quoSigningSecret.trim() })
+        .eq("id", quoWebhook.id)
+        .eq("workspace_id", workspace.id);
+      if (error) throw error;
+      await loadQuoWebhook();
     } finally {
       setBusy(false);
     }
@@ -2704,6 +2797,35 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
                 <button className="btn btn-small btn-danger" onClick={() => revokeToken(token.id)}>{t("delete")}</button>
               </div>
             )) : <div className="section-note">{t("noTokens")}</div>}
+          </div>
+        </div>
+      </div>
+
+      <div className="card card-pad settings mt">
+        <SectionTitle title={t("quoIntegration")} />
+        <div className="settings-row">
+          <div className="settings-copy"><strong>{t("quoWebhookUrl")}</strong><p>{t("quoWebhookUrlNote")}</p></div>
+          <div className="token-copy-box">
+            <textarea readOnly value={visibleQuoToken ? quoWebhookUrl : t("tokenMissing")} onFocus={(event) => event.target.select()} />
+            <button className="btn btn-small" disabled={!visibleQuoToken} onClick={() => copyToken(quoWebhookUrl)}>{t("copyWebhookUrl")}</button>
+          </div>
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><strong>{t("personalToken")}</strong><p>{t("quoTokenNote")}</p></div>
+          <button className="btn btn-primary" disabled={busy || !workspace?.id} onClick={generateQuoWebhook}>{busy ? t("creating") : t("generateQuoWebhook")}</button>
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><strong>{t("quoSigningSecret")}</strong><p>{t("quoSigningSecretNote")}</p></div>
+          <div className="token-copy-box">
+            <input value={quoSigningSecret} placeholder="base64 signing secret" onChange={(event) => setQuoSigningSecret(event.target.value)} />
+            <button className="btn btn-small" disabled={!quoWebhook?.id || busy} onClick={saveQuoSecret}>{t("saveQuoSecret")}</button>
+          </div>
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><strong>{t("quoEvents")}</strong><p>{t("quoEventsNote")}</p></div>
+          <div className="token-list">
+            <div className="token-row"><div><strong>call.completed</strong><span>Match phone number to candidate</span></div><span className="badge badge-green">required</span></div>
+            <div className="token-row"><div><strong>call.summary.completed</strong><span>Import summary and next steps</span></div><span className="badge badge-green">required</span></div>
           </div>
         </div>
       </div>
