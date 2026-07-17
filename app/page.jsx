@@ -127,6 +127,8 @@ const interfaceCopy = {
     documentType: "Тип документа",
     unassignedDocument: "Не назначено",
     receivedFromQuo: "Получено из Quo message",
+    deleteFile: "Удалить файл",
+    deleteFileConfirm: "Удалить этот файл из карточки?",
     summary: "Summary",
     nextSteps: "Next steps",
     callRecording: "Call recording",
@@ -386,6 +388,8 @@ const interfaceCopy = {
     documentType: "Document type",
     unassignedDocument: "Unassigned",
     receivedFromQuo: "Received from Quo message",
+    deleteFile: "Delete file",
+    deleteFileConfirm: "Delete this file from the profile?",
     summary: "Summary",
     nextSteps: "Next steps",
     callRecording: "Call recording",
@@ -1663,6 +1667,22 @@ export default function RecruitingHub() {
     }));
   }
 
+  async function deleteAttachment(attachment) {
+    if (!workspace?.id) throw new Error("Workspace не инициализирован");
+    const { error } = await supabase
+      .from("candidate_attachments")
+      .delete()
+      .eq("workspace_id", workspace.id)
+      .eq("id", attachment.id);
+    if (error) throw error;
+
+    await addActivity(attachment.candidateId, "Quo message attachment removed", "document");
+    setDb((current) => ({
+      ...current,
+      attachments: current.attachments.filter((item) => item.id !== attachment.id)
+    }));
+  }
+
   async function deleteCandidate(candidateId) {
     const { error } = await supabase.from("candidates").delete().eq("id", candidateId).eq("workspace_id", workspace.id);
     if (error) {
@@ -2015,6 +2035,14 @@ export default function RecruitingHub() {
                   notify(error.message);
                 }
               }}
+              deleteAttachment={async (attachment) => {
+                try {
+                  await deleteAttachment(attachment);
+                  notify("Удалено");
+                } catch (error) {
+                  notify(error.message);
+                }
+              }}
               editCandidate={(candidate) => setModal({ type: "candidate", candidate })}
               addFollowup={(candidateId) => setModal({ type: "followup", candidateId })}
               deleteCandidate={deleteCandidate}
@@ -2353,7 +2381,7 @@ function CandidatesView({ db, ui, setUi, openCandidate, editCandidate, startCall
   );
 }
 
-function CandidateProfile({ candidate, activities, quoCalls, attachments, updateCandidate, updateAttachmentDocumentType, editCandidate, addFollowup, deleteCandidate, startCall }) {
+function CandidateProfile({ candidate, activities, quoCalls, attachments, updateCandidate, updateAttachmentDocumentType, deleteAttachment, editCandidate, addFollowup, deleteCandidate, startCall }) {
   const { t } = useI18n();
   const progressIndex = Math.max(0, pipelineStatuses.indexOf(candidate.status));
   const progress = Math.min(100, Math.round((progressIndex / (pipelineStatuses.length - 2)) * 100));
@@ -2396,11 +2424,8 @@ function CandidateProfile({ candidate, activities, quoCalls, attachments, update
             <label className="mt-label">{t("changeStage")}<select value={candidate.status} onChange={(event) => updateCandidate({ ...candidate, status: event.target.value, updatedAt: new Date().toISOString() }, `Статус изменён на ${statusLabel(event.target.value, t)}`, "status")}>{localizedStatuses(t).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             <button className="btn btn-primary full" onClick={() => addFollowup(candidate.id)}>＋ {t("addFollowup")}</button>
           </div>
-          <div className="card card-pad">
-            <div className="info-title">{t("documents")}</div>
-            <div className="docs-grid">{Object.entries(docLabels).map(([key, label]) => <div className="doc-row" key={key}><strong>{label}</strong><select value={candidate.docs[key] || "not_requested"} onChange={(event) => updateCandidate({ ...candidate, docs: { ...candidate.docs, [key]: event.target.value } }, `${label}: ${event.target.value}`, "document")}>{docStatuses.map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></div>)}</div>
-          </div>
-          <CandidateAttachments attachments={attachments || []} onChangeType={updateAttachmentDocumentType} />
+          <CandidateDocuments candidate={candidate} attachments={attachments || []} updateCandidate={updateCandidate} />
+          <CandidateAttachments attachments={attachments || []} onChangeType={updateAttachmentDocumentType} onDelete={deleteAttachment} />
           <div className="card card-pad">
             <div className="info-title">Insurance</div>
             <label>Status<select value={candidate.insurance.status} onChange={(event) => updateCandidate({ ...candidate, insurance: { ...candidate.insurance, status: event.target.value } }, `Insurance status: ${event.target.value}`, "insurance")}>{["not_started", "pending", "approved", "rejected"].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
@@ -2416,15 +2441,52 @@ function CandidateProfile({ candidate, activities, quoCalls, attachments, update
   );
 }
 
-function CandidateAttachments({ attachments, onChangeType }) {
+function CandidateDocuments({ candidate, attachments, updateCandidate }) {
   const { t } = useI18n();
+  const attachmentsByType = (attachments || []).reduce((acc, attachment) => {
+    if (!attachment.documentType || !attachment.externalUrl) return acc;
+    const existing = acc[attachment.documentType];
+    if (!existing || new Date(attachment.createdAt || 0) > new Date(existing.createdAt || 0)) {
+      acc[attachment.documentType] = attachment;
+    }
+    return acc;
+  }, {});
+
+  return (
+    <div className="card card-pad">
+      <div className="info-title">{t("documents")}</div>
+      <div className="docs-grid">
+        {Object.entries(docLabels).map(([key, label]) => {
+          const status = candidate.docs[key] || "not_requested";
+          const attachment = attachmentsByType[key];
+          return (
+            <div className={`doc-row ${status === "received" ? "doc-row-received" : ""}`} key={key}>
+              {attachment ? (
+                <a className="doc-link" href={attachment.externalUrl} target="_blank" rel="noreferrer">{label}</a>
+              ) : (
+                <strong>{label}</strong>
+              )}
+              <select value={status} onChange={(event) => updateCandidate({ ...candidate, docs: { ...candidate.docs, [key]: event.target.value } }, `${label}: ${event.target.value}`, "document")}>
+                {docStatuses.map(([value, title]) => <option key={value} value={value}>{title}</option>)}
+              </select>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CandidateAttachments({ attachments, onChangeType, onDelete }) {
+  const { t } = useI18n();
+  const inboxAttachments = (attachments || []).filter((attachment) => !attachment.documentType);
 
   return (
     <div className="card card-pad">
       <div className="info-title">{t("receivedFiles")}</div>
-      {attachments.length ? (
+      {inboxAttachments.length ? (
         <div className="attachment-list">
-          {attachments.map((attachment) => (
+          {inboxAttachments.map((attachment) => (
             <div className="attachment-item" key={attachment.id}>
               {attachment.mimeType?.startsWith("image/") && attachment.externalUrl ? (
                 <a className="attachment-preview" href={attachment.externalUrl} target="_blank" rel="noreferrer">
@@ -2444,6 +2506,7 @@ function CandidateAttachments({ attachments, onChangeType }) {
                   </select>
                 </label>
                 {attachment.externalUrl ? <a className="attachment-open" href={attachment.externalUrl} target="_blank" rel="noreferrer">{t("openFile")}</a> : null}
+                <button className="btn btn-small btn-danger attachment-delete" onClick={() => window.confirm(t("deleteFileConfirm")) && onDelete(attachment)}>{t("deleteFile")}</button>
               </div>
             </div>
           ))}
