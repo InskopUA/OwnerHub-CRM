@@ -2390,6 +2390,7 @@ function CsvImportModal({ onClose, onImport }) {
                 type="file"
                 accept=".csv,text/csv,.tsv,text/tab-separated-values"
                 multiple
+                disabled={Boolean(result) || busy}
                 onChange={(event) => setFiles(Array.from(event.target.files || []))}
               />
             </label>
@@ -2415,8 +2416,14 @@ function CsvImportModal({ onClose, onImport }) {
           </div>
         </div>
         <div className="modal-foot">
-          <button className="btn" onClick={onClose}>Закрыть</button>
-          <button className="btn btn-primary" disabled={!files.length || busy} onClick={runImport}>{busy ? "Импортируем..." : "Импортировать"}</button>
+          {result ? (
+            <button className="btn btn-primary" onClick={onClose}>Готово</button>
+          ) : (
+            <>
+              <button className="btn" onClick={onClose}>Закрыть</button>
+              <button className="btn btn-primary" disabled={!files.length || busy} onClick={runImport}>{busy ? "Импортируем..." : "Импортировать"}</button>
+            </>
+          )}
         </div>
       </div>
     </div>
