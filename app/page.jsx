@@ -207,7 +207,7 @@ const interfaceCopy = {
     followupsDone: "Follow-ups выполнено",
     productiveCalls: "Результативные звонки",
     activeWorkWindow: "Рабочее окно",
-    productiveCallsNote: "Ответили 60+ сек или есть summary/запись",
+    productiveCallsNote: "Разговор 2+ мин или есть summary/запись",
     dailyBreakdown: "Разбивка по дням",
     dailyBreakdownNote: "Реальная работа HR по дням без массового импорта",
     selectedDate: "Дата",
@@ -459,7 +459,7 @@ const interfaceCopy = {
     followupsDone: "Follow-ups done",
     productiveCalls: "Productive calls",
     activeWorkWindow: "Work window",
-    productiveCallsNote: "Answered 60+ sec or has summary/recording",
+    productiveCallsNote: "Talk time 2+ min or has summary/recording",
     dailyBreakdown: "Daily breakdown",
     dailyBreakdownNote: "Real HR work by day without bulk imports",
     selectedDate: "Date",
@@ -2944,7 +2944,7 @@ function buildAnalytics(db, period, selectedDate) {
     if (call.summary.length || call.nextSteps.length) day.summaries += 1;
     if (call.recordingUrl) day.recordings += 1;
     if (call.answeredAt) day.answered += 1;
-    if (duration >= 60 || call.summary.length || call.nextSteps.length || call.recordingUrl) day.productiveCalls += 1;
+    if (duration >= 120 || call.summary.length || call.nextSteps.length || call.recordingUrl) day.productiveCalls += 1;
   });
 
   days.forEach((day) => {
