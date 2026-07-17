@@ -54,6 +54,28 @@ const firstText = (...values) => values.find((value) => String(value || "").trim
 
 const compactPayload = (body) => JSON.stringify(body);
 
+const normalizeQuoPhoneId = (value) => String(value || "").trim().toLowerCase();
+
+const getObjectPhoneNumberId = (object) =>
+  firstText(object?.phoneNumberId, object?.phone_number_id, object?.phoneNumber?.id, object?.phone_number?.id);
+
+async function getWorkspaceQuoSettings(workspaceId) {
+  const { data, error } = await supabaseAdmin
+    .from("app_settings")
+    .select("quo_sms_from")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (error) throw error;
+  return { phoneNumberId: data?.quo_sms_from || "" };
+}
+
+function matchesConfiguredQuoPhone(settings, object) {
+  const configured = normalizeQuoPhoneId(settings?.phoneNumberId);
+  if (!configured) return true;
+  const eventPhoneNumberId = normalizeQuoPhoneId(getObjectPhoneNumberId(object));
+  return eventPhoneNumberId === configured;
+}
+
 function timingSafeEqualBase64(a, b) {
   const left = Buffer.from(String(a || ""), "base64");
   const right = Buffer.from(String(b || ""), "base64");
@@ -301,6 +323,11 @@ async function handleCallRinging(workspaceId, eventId, body, object) {
   const callId = object?.id || object?.callId || "";
   if (!callId) return { ok: true, ignored: true, reason: "Missing call id" };
 
+  const settings = await getWorkspaceQuoSettings(workspaceId);
+  if (!matchesConfiguredQuoPhone(settings, object)) {
+    return { ok: true, ignored: true, callId, reason: "Different Quo phone number" };
+  }
+
   const direction = object?.direction || "incoming";
   const fromNumber = firstText(object?.from, object?.fromNumber, object?.from_number);
   const toNumber = firstText(object?.to, object?.toNumber, object?.to_number);
@@ -319,7 +346,7 @@ async function handleCallRinging(workspaceId, eventId, body, object) {
     direction,
     status: "ringing",
     conversation_id: object?.conversationId || "",
-    phone_number_id: object?.phoneNumberId || "",
+    phone_number_id: getObjectPhoneNumberId(object),
     started_at: startedAt,
     raw_payload: body
   };
@@ -336,6 +363,11 @@ async function handleCallCompleted(workspaceId, eventId, body, object) {
   const callId = object?.id || object?.callId || "";
   if (!callId) return { ok: true, ignored: true, reason: "Missing call id" };
 
+  const settings = await getWorkspaceQuoSettings(workspaceId);
+  if (!matchesConfiguredQuoPhone(settings, object)) {
+    return { ok: true, ignored: true, callId, reason: "Different Quo phone number" };
+  }
+
   const direction = object?.direction || "";
   const candidatePhone = direction === "outgoing" ? object?.to : direction === "incoming" ? object?.from : "";
   const candidate = await findCandidateByPhone(workspaceId, [candidatePhone, object?.from, object?.to]);
@@ -350,7 +382,7 @@ async function handleCallCompleted(workspaceId, eventId, body, object) {
     to_number: object?.to || "",
     direction,
     conversation_id: object?.conversationId || "",
-    phone_number_id: object?.phoneNumberId || "",
+    phone_number_id: getObjectPhoneNumberId(object),
     user_id: object?.userId || "",
     answered_at: safeDate(object?.answeredAt),
     completed_at: safeDate(object?.completedAt || object?.createdAt),
@@ -393,6 +425,7 @@ async function handleSummaryCompleted(workspaceId, eventId, body, object) {
     .eq("call_id", callId)
     .maybeSingle();
   if (existingError) throw existingError;
+  if (!existing) return { ok: true, ignored: true, callId, reason: "Call was not imported for the configured Quo phone number" };
 
   const row = {
     workspace_id: workspaceId,
@@ -429,6 +462,7 @@ async function handleRecordingCompleted(workspaceId, eventId, body, object) {
     .eq("call_id", callId)
     .maybeSingle();
   if (existingError) throw existingError;
+  if (!existing) return { ok: true, ignored: true, callId, reason: "Call was not imported for the configured Quo phone number" };
 
   const row = {
     workspace_id: workspaceId,
@@ -453,6 +487,11 @@ async function handleRecordingCompleted(workspaceId, eventId, body, object) {
 
 async function handleMessageReceived(workspaceId, eventId, body, object) {
   const messageId = object?.id || object?.messageId || object?.message_id || eventId || "";
+  const settings = await getWorkspaceQuoSettings(workspaceId);
+  if (!matchesConfiguredQuoPhone(settings, object)) {
+    return { ok: true, ignored: true, messageId, reason: "Different Quo phone number" };
+  }
+
   const fromNumber = firstText(object?.from, object?.fromNumber, object?.from_number, object?.sender?.phoneNumber, object?.sender?.phone_number);
   const toNumber = firstText(object?.to, object?.toNumber, object?.to_number, object?.phoneNumber, object?.phone_number);
   const media = extractMessageMedia(object);

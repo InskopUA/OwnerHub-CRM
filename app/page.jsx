@@ -1119,6 +1119,8 @@ function mapQuoLiveCall(row) {
   };
 }
 
+const normalizeQuoPhoneId = (value) => String(value || "").trim().toLowerCase();
+
 function splitCandidateNotes(notes = "") {
   const text = String(notes || "");
   const marker = /(?:^|\n{2,})Quo call summary - /g;
@@ -1440,7 +1442,7 @@ export default function RecruitingHub() {
     loadLiveCalls();
     const timer = globalThis.setInterval(loadLiveCalls, 5000);
     return () => globalThis.clearInterval(timer);
-  }, [workspace?.id, session]);
+  }, [workspace?.id, session, db.settings.quoSmsFrom]);
 
   useEffect(() => {
     writeUiToHash(ui);
@@ -1623,6 +1625,7 @@ export default function RecruitingHub() {
 
   async function loadLiveCalls() {
     if (!workspace?.id) return;
+    const configuredPhoneNumberId = normalizeQuoPhoneId(db.settings.quoSmsFrom);
     const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from("quo_live_calls")
@@ -1637,7 +1640,10 @@ export default function RecruitingHub() {
       return;
     }
     if (error) return;
-    setLiveCalls((data || []).map(mapQuoLiveCall));
+    const calls = (data || [])
+      .map(mapQuoLiveCall)
+      .filter((call) => !configuredPhoneNumberId || normalizeQuoPhoneId(call.phoneNumberId) === configuredPhoneNumberId);
+    setLiveCalls(calls);
   }
 
   async function addActivity(candidateId, text, type = "note") {
