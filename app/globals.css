@@ -192,6 +192,16 @@ small { color: var(--muted); }
 .info-item span { color: var(--muted); font-size: 11px; display: block; }
 .info-item strong { display: block; margin-top: 4px; font-size: 13px; word-break: break-word; }
 .notes { font-size: 13px; line-height: 1.65; white-space: pre-wrap; }
+.quo-summary-section { background: #fbfbfa; }
+.quo-summary-list { display: grid; gap: 12px; }
+.quo-summary-item { border: 1px solid var(--line); border-radius: 12px; background: white; padding: 14px; }
+.quo-summary-meta { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--muted); font-size: 11px; margin-bottom: 8px; }
+.quo-summary-meta span { text-transform: uppercase; letter-spacing: .06em; font-weight: 900; color: #7b6500; }
+.quo-summary-phone { font-size: 12px; font-weight: 800; margin-bottom: 12px; color: #383a3f; }
+.quo-summary-block { display: grid; gap: 7px; margin-top: 10px; }
+.quo-summary-block strong { font-size: 12px; }
+.quo-summary-block ul { margin: 0; padding-left: 18px; display: grid; gap: 5px; }
+.quo-summary-block li { font-size: 13px; line-height: 1.45; }
 .docs-grid { display: grid; gap: 9px; }
 .doc-row { display: grid; grid-template-columns: 1fr 132px; gap: 12px; align-items: center; border: 1px solid var(--line); padding: 10px 12px; border-radius: 12px; }
 .doc-row strong { font-size: 12px; }

@@ -170,16 +170,6 @@ async function maybeCreateNextStepFollowup(workspaceId, candidateId, nextSteps) 
   return true;
 }
 
-function buildSummaryNote({ event, summary, nextSteps }) {
-  const date = new Date().toISOString().slice(0, 10);
-  const lines = [`Quo call summary - ${date}`];
-  if (event?.direction) lines.push(`Direction: ${event.direction}`);
-  if (event?.from_number || event?.to_number) lines.push(`Call: ${event.from_number || "-"} -> ${event.to_number || "-"}`);
-  if (summary.length) lines.push("", "Summary:", ...summary.map((item) => `- ${item}`));
-  if (nextSteps.length) lines.push("", "Next steps:", ...nextSteps.map((item) => `- ${item}`));
-  return lines.join("\n");
-}
-
 async function applySummaryToCandidate(workspaceId, callId) {
   const { data: event, error: eventError } = await supabaseAdmin
     .from("quo_call_events")
@@ -196,18 +186,15 @@ async function applySummaryToCandidate(workspaceId, callId) {
 
   const { data: candidate, error: candidateError } = await supabaseAdmin
     .from("candidates")
-    .select("id, notes, status")
+    .select("id, status")
     .eq("workspace_id", workspaceId)
     .eq("id", event.candidate_id)
     .maybeSingle();
   if (candidateError) throw candidateError;
   if (!candidate) return { imported: false, candidateId: event.candidate_id };
 
-  const noteBlock = buildSummaryNote({ event, summary, nextSteps });
-  const nextNotes = [candidate.notes, noteBlock].filter(Boolean).join("\n\n");
   const importedAt = new Date().toISOString();
   const updates = {
-    notes: nextNotes,
     last_contact: importedAt
   };
   if (candidate.status === "new") updates.status = "contact_attempted";

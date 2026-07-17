@@ -117,6 +117,10 @@ const interfaceCopy = {
     insuranceRejection: "Отказ страховой ранее",
     comments: "Комментарии",
     noComments: "Комментариев пока нет.",
+    quoCallSummaries: "Quo call summaries",
+    noQuoSummaries: "Quo summary пока нет.",
+    summary: "Summary",
+    nextSteps: "Next steps",
     restrictions: "Ограничения",
     onboardingProgress: "Прогресс онбординга",
     changeStage: "Изменить этап",
@@ -335,6 +339,10 @@ const interfaceCopy = {
     insuranceRejection: "Previous insurance rejection",
     comments: "Comments",
     noComments: "No comments yet.",
+    quoCallSummaries: "Quo Call Summaries",
+    noQuoSummaries: "No Quo summaries yet.",
+    summary: "Summary",
+    nextSteps: "Next steps",
     restrictions: "Restrictions",
     onboardingProgress: "Onboarding Progress",
     changeStage: "Change stage",
@@ -880,6 +888,44 @@ function mapKnowledgeItem(row) {
   };
 }
 
+function mapQuoCallEvent(row) {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    candidateId: row.candidate_id,
+    callId: row.call_id,
+    eventType: row.event_type || "",
+    fromNumber: row.from_number || "",
+    toNumber: row.to_number || "",
+    direction: row.direction || "",
+    answeredAt: row.answered_at || "",
+    completedAt: row.completed_at || "",
+    summary: Array.isArray(row.summary) ? row.summary.filter(Boolean) : [],
+    nextSteps: Array.isArray(row.next_steps) ? row.next_steps.filter(Boolean) : [],
+    importedAt: row.summary_imported_at || "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function splitCandidateNotes(notes = "") {
+  const text = String(notes || "");
+  const marker = /(?:^|\n{2,})Quo call summary - /g;
+  const matches = [...text.matchAll(marker)];
+  if (!matches.length) return { comments: text.trim(), legacyQuoBlocks: [] };
+
+  const firstStart = matches[0].index + (matches[0][0].startsWith("\n") ? matches[0][0].indexOf("Quo") : 0);
+  const comments = text.slice(0, firstStart).trim();
+  const legacyQuoBlocks = matches.map((match, index) => {
+    const start = match.index + (match[0].startsWith("\n") ? match[0].indexOf("Quo") : 0);
+    const nextMatch = matches[index + 1];
+    const end = nextMatch ? nextMatch.index : text.length;
+    return text.slice(start, end).trim();
+  }).filter(Boolean);
+
+  return { comments, legacyQuoBlocks };
+}
+
 function blankKnowledgeItem() {
   return {
     id: `kb_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
@@ -1131,7 +1177,7 @@ export default function RecruitingHub() {
   const [workspace, setWorkspace] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [db, setDb] = useState({ settings: defaultSettings, candidates: [], followups: [], activities: [], knowledge: [] });
+  const [db, setDb] = useState({ settings: defaultSettings, candidates: [], followups: [], activities: [], knowledge: [], quoCalls: [] });
   const [ui, setUi] = useState(() => {
     const hashUi = readUiFromHash();
     return {
@@ -1171,7 +1217,7 @@ export default function RecruitingHub() {
     if (session) loadRemoteData();
     else {
       setWorkspace(null);
-      setDb({ settings: defaultSettings, candidates: [], followups: [], activities: [], knowledge: [] });
+      setDb({ settings: defaultSettings, candidates: [], followups: [], activities: [], knowledge: [], quoCalls: [] });
     }
   }, [session]);
 
@@ -1250,14 +1296,16 @@ export default function RecruitingHub() {
         insuranceResult,
         callStateResult,
         followupsResult,
-        activitiesResult
+        activitiesResult,
+        quoCallsResult
       ] = await Promise.all([
         supabase.from("candidate_equipment").select("*").eq("workspace_id", currentWorkspace.id),
         supabase.from("candidate_documents").select("*").eq("workspace_id", currentWorkspace.id),
         supabase.from("candidate_insurance").select("*").eq("workspace_id", currentWorkspace.id),
         supabase.from("candidate_call_state").select("*").eq("workspace_id", currentWorkspace.id),
         supabase.from("followups").select("*").eq("workspace_id", currentWorkspace.id).order("followup_date", { ascending: true }),
-        supabase.from("activities").select("*").eq("workspace_id", currentWorkspace.id).order("created_at", { ascending: false }).limit(500)
+        supabase.from("activities").select("*").eq("workspace_id", currentWorkspace.id).order("created_at", { ascending: false }).limit(500),
+        supabase.from("quo_call_events").select("*").eq("workspace_id", currentWorkspace.id).order("completed_at", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false }).limit(500)
       ]);
 
       let knowledgeRows = [];
@@ -1295,8 +1343,9 @@ export default function RecruitingHub() {
         insuranceResult.error,
         callStateResult.error,
         followupsResult.error,
-        activitiesResult.error
-      ].filter(Boolean);
+        activitiesResult.error,
+        quoCallsResult.error
+      ].filter((error) => error && error.code !== "42P01");
       if (errors.length) throw errors[0];
 
       const settingsRow = settingsResult.data;
@@ -1322,7 +1371,8 @@ export default function RecruitingHub() {
         ),
         followups: (followupsResult.data || []).map(mapFollowup),
         activities: (activitiesResult.data || []).map(mapActivity),
-        knowledge: knowledgeRows.map(mapKnowledgeItem)
+        knowledge: knowledgeRows.map(mapKnowledgeItem),
+        quoCalls: quoCallsResult.error?.code === "42P01" ? [] : (quoCallsResult.data || []).map(mapQuoCallEvent)
       });
     } catch (error) {
       notify(error.message || "Не удалось загрузить данные Supabase");
@@ -1763,6 +1813,7 @@ export default function RecruitingHub() {
             <CandidateProfile
               candidate={selectedCandidate}
               activities={db.activities.filter((activity) => activity.candidateId === selectedCandidate.id).slice(0, 12)}
+              quoCalls={db.quoCalls.filter((call) => call.candidateId === selectedCandidate.id)}
               updateCandidate={async (candidate, activityText, activityType) => {
                 try {
                   const previousStatus = selectedCandidate.status;
@@ -2109,10 +2160,18 @@ function CandidatesView({ db, ui, setUi, openCandidate, editCandidate, startCall
   );
 }
 
-function CandidateProfile({ candidate, activities, updateCandidate, editCandidate, addFollowup, deleteCandidate, startCall }) {
+function CandidateProfile({ candidate, activities, quoCalls, updateCandidate, editCandidate, addFollowup, deleteCandidate, startCall }) {
   const { t } = useI18n();
   const progressIndex = Math.max(0, pipelineStatuses.indexOf(candidate.status));
   const progress = Math.min(100, Math.round((progressIndex / (pipelineStatuses.length - 2)) * 100));
+  const { comments, legacyQuoBlocks } = splitCandidateNotes(candidate.notes);
+  const realQuoCalls = (quoCalls || []).filter((call) => call.summary.length || call.nextSteps.length);
+  const legacyQuoCalls = realQuoCalls.length ? [] : legacyQuoBlocks.map((block, index) => ({
+    id: `legacy_quo_${index}`,
+    legacyBlock: block,
+    createdAt: candidate.updatedAt
+  }));
+  const visibleQuoCalls = [...realQuoCalls, ...legacyQuoCalls];
 
   return (
     <>
@@ -2133,7 +2192,8 @@ function CandidateProfile({ candidate, activities, updateCandidate, editCandidat
           <InfoSection title={t("driver")} items={[["CDL", candidate.cdl], ["License type", candidate.licenseType], [t("experience"), candidate.experienceYears ? `${candidate.experienceYears} years` : ""], ["Car hauling", candidate.carHaulingYears ? `${candidate.carHaulingYears} years` : ""], ["Two-car experience", candidate.twoCarExperience], ["Medical Card", candidate.medicalCard], [t("accidents"), candidate.accidents], [t("violations"), candidate.violations], [t("insuranceRejection"), candidate.previousInsuranceRejection]]} />
           <InfoSection title="Truck" items={[["Марка / модель", [candidate.truck.make, candidate.truck.model].filter(Boolean).join(" ")], ["Год", candidate.truck.year], ["VIN", candidate.truck.vin], ["GVWR", candidate.truck.gvwr], ["Топливо", candidate.truck.fuel], ["Состояние", candidate.truck.condition], ["Инспекция", candidate.truck.inspection]]} />
           <InfoSection title="Trailer" items={[["Марка / модель", [candidate.trailer.make, candidate.trailer.model].filter(Boolean).join(" ")], ["Год", candidate.trailer.year], ["VIN", candidate.trailer.vin], ["Длина", candidate.trailer.length], ["GVWR", candidate.trailer.gvwr], ["Тип", candidate.trailer.type], ["Вместимость", `${candidate.trailer.capacity || "2"} cars`], ["Состояние", candidate.trailer.condition], ["Инспекция", candidate.trailer.inspection]]} />
-          <div className="info-section"><div className="info-title">{t("comments")}</div><div className="notes">{candidate.notes || t("noComments")}</div>{candidate.restrictions ? <div className="script-help"><b>{t("restrictions")}:</b> {candidate.restrictions}</div> : null}</div>
+          <div className="info-section"><div className="info-title">{t("comments")}</div><div className="notes">{comments || t("noComments")}</div>{candidate.restrictions ? <div className="script-help"><b>{t("restrictions")}:</b> {candidate.restrictions}</div> : null}</div>
+          <QuoSummarySection summaries={visibleQuoCalls} />
         </div>
         <div className="grid side-grid">
           <div className="card card-pad">
@@ -2159,6 +2219,45 @@ function CandidateProfile({ candidate, activities, updateCandidate, editCandidat
         </div>
       </div>
     </>
+  );
+}
+
+function QuoSummarySection({ summaries }) {
+  const { t } = useI18n();
+
+  return (
+    <div className="info-section quo-summary-section">
+      <div className="info-title">{t("quoCallSummaries")}</div>
+      {summaries.length ? (
+        <div className="quo-summary-list">
+          {summaries.map((item) => item.legacyBlock ? (
+            <div className="quo-summary-item" key={item.id}>
+              <div className="quo-summary-meta"><span>Quo</span><time>{fmtDate(item.createdAt, true)}</time></div>
+              <div className="notes">{item.legacyBlock}</div>
+            </div>
+          ) : (
+            <div className="quo-summary-item" key={item.id}>
+              <div className="quo-summary-meta">
+                <span>{item.direction || "call"}</span>
+                <time>{fmtDate(item.completedAt || item.answeredAt || item.createdAt, true)}</time>
+              </div>
+              <div className="quo-summary-phone">{[item.fromNumber, item.toNumber].filter(Boolean).join(" -> ") || item.callId}</div>
+              {item.summary.length ? <QuoSummaryList title={t("summary")} items={item.summary} /> : null}
+              {item.nextSteps.length ? <QuoSummaryList title={t("nextSteps")} items={item.nextSteps} /> : null}
+            </div>
+          ))}
+        </div>
+      ) : <div className="section-note">{t("noQuoSummaries")}</div>}
+    </div>
+  );
+}
+
+function QuoSummaryList({ title, items }) {
+  return (
+    <div className="quo-summary-block">
+      <strong>{title}</strong>
+      <ul>{items.map((item, index) => <li key={`${title}_${index}`}>{item}</li>)}</ul>
+    </div>
   );
 }
 
