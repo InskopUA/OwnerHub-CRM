@@ -295,6 +295,29 @@ create table if not exists public.activities (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.candidate_attachments (
+  id text primary key default ('att_' || replace(gen_random_uuid()::text, '-', '')),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  candidate_id text references public.candidates(id) on delete cascade,
+  source text not null default 'quo_message',
+  message_id text not null default '',
+  from_number text not null default '',
+  to_number text not null default '',
+  direction text not null default 'incoming',
+  document_type text not null default '',
+  file_name text not null default '',
+  mime_type text not null default '',
+  size_bytes integer,
+  external_url text not null default '',
+  storage_path text not null default '',
+  notes text not null default '',
+  raw_payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  unique (workspace_id, message_id, external_url)
+);
+
 create table if not exists public.quo_call_events (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
@@ -340,6 +363,20 @@ alter table public.call_sessions add column if not exists workspace_id uuid refe
 alter table public.call_knowledge_items add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.followups add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.activities add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
+alter table public.candidate_attachments add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
+alter table public.candidate_attachments add column if not exists source text not null default 'quo_message';
+alter table public.candidate_attachments add column if not exists message_id text not null default '';
+alter table public.candidate_attachments add column if not exists from_number text not null default '';
+alter table public.candidate_attachments add column if not exists to_number text not null default '';
+alter table public.candidate_attachments add column if not exists direction text not null default 'incoming';
+alter table public.candidate_attachments add column if not exists document_type text not null default '';
+alter table public.candidate_attachments add column if not exists file_name text not null default '';
+alter table public.candidate_attachments add column if not exists mime_type text not null default '';
+alter table public.candidate_attachments add column if not exists size_bytes integer;
+alter table public.candidate_attachments add column if not exists external_url text not null default '';
+alter table public.candidate_attachments add column if not exists storage_path text not null default '';
+alter table public.candidate_attachments add column if not exists notes text not null default '';
+alter table public.candidate_attachments add column if not exists raw_payload jsonb not null default '{}'::jsonb;
 alter table public.quo_call_events add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.quo_call_events add column if not exists summary_imported_at timestamptz;
 alter table public.quo_call_events add column if not exists recording_url text not null default '';
@@ -363,6 +400,9 @@ create index if not exists idx_followups_candidate_id on public.followups(candid
 create index if not exists idx_followups_open_date on public.followups(status, followup_date, followup_time);
 create index if not exists idx_activities_workspace_id on public.activities(workspace_id);
 create index if not exists idx_activities_candidate_id_created on public.activities(candidate_id, created_at desc);
+create index if not exists idx_candidate_attachments_workspace_id on public.candidate_attachments(workspace_id);
+create index if not exists idx_candidate_attachments_candidate_id_created on public.candidate_attachments(candidate_id, created_at desc);
+create index if not exists idx_candidate_attachments_message_id on public.candidate_attachments(workspace_id, message_id);
 create index if not exists idx_documents_candidate_id on public.candidate_documents(candidate_id);
 create index if not exists idx_equipment_candidate_id on public.candidate_equipment(candidate_id);
 create index if not exists idx_equipment_workspace_id on public.candidate_equipment(workspace_id);
@@ -476,6 +516,11 @@ create trigger set_updated_at_call_knowledge_items
 before update on public.call_knowledge_items
 for each row execute function public.set_updated_at();
 
+drop trigger if exists set_updated_at_candidate_attachments on public.candidate_attachments;
+create trigger set_updated_at_candidate_attachments
+before update on public.candidate_attachments
+for each row execute function public.set_updated_at();
+
 drop trigger if exists set_updated_at_quo_call_events on public.quo_call_events;
 create trigger set_updated_at_quo_call_events
 before update on public.quo_call_events
@@ -492,6 +537,7 @@ alter table public.candidate_insurance enable row level security;
 alter table public.candidate_call_state enable row level security;
 alter table public.call_sessions enable row level security;
 alter table public.call_knowledge_items enable row level security;
+alter table public.candidate_attachments enable row level security;
 alter table public.followups enable row level security;
 alter table public.activities enable row level security;
 alter table public.quo_call_events enable row level security;
@@ -734,6 +780,25 @@ with check (
   exists (
     select 1 from public.workspaces w
     where w.id = activities.workspace_id
+      and w.owner_user_id = auth.uid()
+  )
+);
+
+drop policy if exists "authenticated all candidate attachments" on public.candidate_attachments;
+create policy "authenticated all candidate attachments"
+on public.candidate_attachments for all
+to authenticated
+using (
+  exists (
+    select 1 from public.workspaces w
+    where w.id = candidate_attachments.workspace_id
+      and w.owner_user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1 from public.workspaces w
+    where w.id = candidate_attachments.workspace_id
       and w.owner_user_id = auth.uid()
   )
 );

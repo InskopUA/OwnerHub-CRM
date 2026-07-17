@@ -45,6 +45,13 @@ const toNumberOrNull = (value) => {
   return Number.isFinite(number) ? Math.round(number) : null;
 };
 
+const arrayFrom = (value) => {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+};
+
+const firstText = (...values) => values.find((value) => String(value || "").trim()) || "";
+
 const compactPayload = (body) => JSON.stringify(body);
 
 function timingSafeEqualBase64(a, b) {
@@ -132,6 +139,25 @@ async function insertActivity(workspaceId, candidateId, text, type = "call") {
     text
   });
   if (error) throw error;
+}
+
+function extractMessageMedia(object) {
+  return [
+    ...arrayFrom(object?.media),
+    ...arrayFrom(object?.attachments),
+    ...arrayFrom(object?.files)
+  ]
+    .map((item) => {
+      if (typeof item === "string") return { url: item };
+      return item || {};
+    })
+    .map((item) => ({
+      url: firstText(item.url, item.downloadUrl, item.download_url, item.href, item.link),
+      mimeType: firstText(item.mimeType, item.mime_type, item.type, item.contentType, item.content_type),
+      fileName: firstText(item.fileName, item.file_name, item.name),
+      sizeBytes: toNumberOrNull(item.sizeBytes || item.size_bytes || item.size)
+    }))
+    .filter((item) => item.url);
 }
 
 async function maybeCreateNextStepFollowup(workspaceId, candidateId, nextSteps) {
@@ -373,6 +399,49 @@ async function handleRecordingCompleted(workspaceId, eventId, body, object) {
   return { ok: true, callId, recordingLinked: recordingResult.imported, candidateId: recordingResult.candidateId };
 }
 
+async function handleMessageReceived(workspaceId, eventId, body, object) {
+  const messageId = object?.id || object?.messageId || object?.message_id || eventId || "";
+  const fromNumber = firstText(object?.from, object?.fromNumber, object?.from_number, object?.sender?.phoneNumber, object?.sender?.phone_number);
+  const toNumber = firstText(object?.to, object?.toNumber, object?.to_number, object?.phoneNumber, object?.phone_number);
+  const media = extractMessageMedia(object);
+
+  if (!media.length) return { ok: true, ignored: true, reason: "Message has no media", messageId };
+
+  const candidate = await findCandidateByPhone(workspaceId, [fromNumber, object?.contact?.phoneNumber, object?.contact?.phone_number]);
+  const rows = media.map((item, index) => ({
+    id: `att_${Date.now().toString(36)}_${index}_${Math.random().toString(36).slice(2, 8)}`,
+    workspace_id: workspaceId,
+    candidate_id: candidate?.id || null,
+    source: "quo_message",
+    message_id: messageId,
+    from_number: fromNumber,
+    to_number: toNumber,
+    direction: "incoming",
+    document_type: "",
+    file_name: item.fileName || `Quo attachment ${index + 1}`,
+    mime_type: item.mimeType,
+    size_bytes: item.sizeBytes,
+    external_url: item.url,
+    raw_payload: body
+  }));
+
+  const { error } = await supabaseAdmin
+    .from("candidate_attachments")
+    .upsert(rows, { onConflict: "workspace_id,message_id,external_url" });
+  if (error) throw error;
+
+  if (candidate?.id) {
+    await insertActivity(workspaceId, candidate.id, `Quo message attachment received (${media.length})`, "document");
+    await supabaseAdmin
+      .from("candidates")
+      .update({ last_contact: safeDate(object?.createdAt || object?.created_at) || new Date().toISOString() })
+      .eq("workspace_id", workspaceId)
+      .eq("id", candidate.id);
+  }
+
+  return { ok: true, messageId, matched: Boolean(candidate?.id), candidateId: candidate?.id || null, attachments: media.length };
+}
+
 export async function POST(request) {
   try {
     if (!hasSupabaseAdminEnv) {
@@ -402,6 +471,8 @@ export async function POST(request) {
       result = await handleSummaryCompleted(webhook.workspace_id, body?.id, body, object);
     } else if (body?.type === "call.recording.completed") {
       result = await handleRecordingCompleted(webhook.workspace_id, body?.id, body, object);
+    } else if (body?.type === "message.received") {
+      result = await handleMessageReceived(webhook.workspace_id, body?.id, body, object);
     } else {
       result = { ok: true, ignored: true, eventType: body?.type || "" };
     }

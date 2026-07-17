@@ -121,6 +121,12 @@ const interfaceCopy = {
     noComments: "Комментариев пока нет.",
     quoCallSummaries: "Quo call summaries",
     noQuoSummaries: "Quo summary пока нет.",
+    receivedFiles: "Полученные файлы",
+    noReceivedFiles: "Пока нет файлов из Quo messages.",
+    openFile: "Открыть файл",
+    documentType: "Тип документа",
+    unassignedDocument: "Не назначено",
+    receivedFromQuo: "Получено из Quo message",
     summary: "Summary",
     nextSteps: "Next steps",
     callRecording: "Call recording",
@@ -171,7 +177,7 @@ const interfaceCopy = {
     quoSigningSecretNote: "В Quo откройте webhook details → Reveal signing secret и вставьте base64 secret сюда.",
     saveQuoSecret: "Save signing secret",
     quoEvents: "Events to enable",
-    quoEventsNote: "В Quo выберите call.completed, call.summary.completed и call.recording.completed. Система привяжет звонок, summary и запись к кандидату.",
+    quoEventsNote: "В Quo выберите call.completed, call.summary.completed, call.recording.completed и message.received. Система привяжет звонок, summary, запись и фото документов к кандидату.",
     copyWebhookUrl: "Copy webhook URL",
     close: "Закрыть",
     done: "Готово",
@@ -374,6 +380,12 @@ const interfaceCopy = {
     noComments: "No comments yet.",
     quoCallSummaries: "Quo Call Summaries",
     noQuoSummaries: "No Quo summaries yet.",
+    receivedFiles: "Received Files",
+    noReceivedFiles: "No files from Quo messages yet.",
+    openFile: "Open file",
+    documentType: "Document type",
+    unassignedDocument: "Unassigned",
+    receivedFromQuo: "Received from Quo message",
     summary: "Summary",
     nextSteps: "Next steps",
     callRecording: "Call recording",
@@ -424,7 +436,7 @@ const interfaceCopy = {
     quoSigningSecretNote: "In Quo, open webhook details → Reveal signing secret and paste the base64 secret here.",
     saveQuoSecret: "Save signing secret",
     quoEvents: "Events to enable",
-    quoEventsNote: "In Quo, select call.completed, call.summary.completed, and call.recording.completed. The system links the call, summary, and recording to the candidate.",
+    quoEventsNote: "In Quo, select call.completed, call.summary.completed, call.recording.completed, and message.received. The system links calls, summaries, recordings, and document photos to the candidate.",
     copyWebhookUrl: "Copy webhook URL",
     close: "Close",
     done: "Done",
@@ -1011,6 +1023,28 @@ function mapQuoCallEvent(row) {
   };
 }
 
+function mapCandidateAttachment(row) {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    candidateId: row.candidate_id,
+    source: row.source || "quo_message",
+    messageId: row.message_id || "",
+    fromNumber: row.from_number || "",
+    toNumber: row.to_number || "",
+    direction: row.direction || "incoming",
+    documentType: row.document_type || "",
+    fileName: row.file_name || "",
+    mimeType: row.mime_type || "",
+    sizeBytes: row.size_bytes ?? "",
+    externalUrl: row.external_url || "",
+    storagePath: row.storage_path || "",
+    notes: row.notes || "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
 function splitCandidateNotes(notes = "") {
   const text = String(notes || "");
   const marker = /(?:^|\n{2,})Quo call summary - /g;
@@ -1280,7 +1314,8 @@ export default function RecruitingHub() {
   const [workspace, setWorkspace] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [db, setDb] = useState({ settings: defaultSettings, candidates: [], followups: [], activities: [], knowledge: [], quoCalls: [] });
+  const emptyDb = { settings: defaultSettings, candidates: [], followups: [], activities: [], knowledge: [], quoCalls: [], attachments: [] };
+  const [db, setDb] = useState(emptyDb);
   const [ui, setUi] = useState(() => {
     const hashUi = readUiFromHash();
     return {
@@ -1320,7 +1355,7 @@ export default function RecruitingHub() {
     if (session) loadRemoteData();
     else {
       setWorkspace(null);
-      setDb({ settings: defaultSettings, candidates: [], followups: [], activities: [], knowledge: [], quoCalls: [] });
+      setDb(emptyDb);
     }
   }, [session]);
 
@@ -1400,7 +1435,8 @@ export default function RecruitingHub() {
         callStateResult,
         followupsResult,
         activitiesResult,
-        quoCallsResult
+        quoCallsResult,
+        attachmentsResult
       ] = await Promise.all([
         supabase.from("candidate_equipment").select("*").eq("workspace_id", currentWorkspace.id),
         supabase.from("candidate_documents").select("*").eq("workspace_id", currentWorkspace.id),
@@ -1408,7 +1444,8 @@ export default function RecruitingHub() {
         supabase.from("candidate_call_state").select("*").eq("workspace_id", currentWorkspace.id),
         supabase.from("followups").select("*").eq("workspace_id", currentWorkspace.id).order("followup_date", { ascending: true }),
         supabase.from("activities").select("*").eq("workspace_id", currentWorkspace.id).order("created_at", { ascending: false }).limit(500),
-        supabase.from("quo_call_events").select("*").eq("workspace_id", currentWorkspace.id).order("completed_at", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false }).limit(500)
+        supabase.from("quo_call_events").select("*").eq("workspace_id", currentWorkspace.id).order("completed_at", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false }).limit(500),
+        supabase.from("candidate_attachments").select("*").eq("workspace_id", currentWorkspace.id).order("created_at", { ascending: false }).limit(500)
       ]);
 
       let knowledgeRows = [];
@@ -1447,7 +1484,8 @@ export default function RecruitingHub() {
         callStateResult.error,
         followupsResult.error,
         activitiesResult.error,
-        quoCallsResult.error
+        quoCallsResult.error,
+        attachmentsResult.error
       ].filter((error) => error && error.code !== "42P01");
       if (errors.length) throw errors[0];
 
@@ -1475,7 +1513,8 @@ export default function RecruitingHub() {
         followups: (followupsResult.data || []).map(mapFollowup),
         activities: (activitiesResult.data || []).map(mapActivity),
         knowledge: knowledgeRows.map(mapKnowledgeItem),
-        quoCalls: quoCallsResult.error?.code === "42P01" ? [] : (quoCallsResult.data || []).map(mapQuoCallEvent)
+        quoCalls: quoCallsResult.error?.code === "42P01" ? [] : (quoCallsResult.data || []).map(mapQuoCallEvent),
+        attachments: attachmentsResult.error?.code === "42P01" ? [] : (attachmentsResult.data || []).map(mapCandidateAttachment)
       });
     } catch (error) {
       notify(error.message || "Не удалось загрузить данные Supabase");
@@ -1583,6 +1622,45 @@ export default function RecruitingHub() {
       };
     });
     return next;
+  }
+
+  async function updateAttachmentDocumentType(attachment, documentType) {
+    if (!workspace?.id) throw new Error("Workspace не инициализирован");
+    const { data, error } = await supabase
+      .from("candidate_attachments")
+      .update({ document_type: documentType })
+      .eq("workspace_id", workspace.id)
+      .eq("id", attachment.id)
+      .select("*")
+      .single();
+    if (error) throw error;
+
+    let nextDocStatus = null;
+    if (documentType) {
+      const { error: docError } = await supabase
+        .from("candidate_documents")
+        .upsert({
+          workspace_id: workspace.id,
+          candidate_id: attachment.candidateId,
+          document_type: documentType,
+          status: "received"
+        }, { onConflict: "candidate_id,document_type" });
+      if (docError) throw docError;
+      await addActivity(attachment.candidateId, `${docLabels[documentType] || documentType}: received from Quo message`, "document");
+      nextDocStatus = "received";
+    }
+
+    setDb((current) => ({
+      ...current,
+      attachments: current.attachments.map((item) => (item.id === attachment.id ? mapCandidateAttachment(data) : item)),
+      candidates: nextDocStatus
+        ? current.candidates.map((candidate) => (
+            candidate.id === attachment.candidateId
+              ? { ...candidate, docs: { ...candidate.docs, [documentType]: nextDocStatus } }
+              : candidate
+          ))
+        : current.candidates
+    }));
   }
 
   async function deleteCandidate(candidateId) {
@@ -1918,11 +1996,20 @@ export default function RecruitingHub() {
               candidate={selectedCandidate}
               activities={db.activities.filter((activity) => activity.candidateId === selectedCandidate.id).slice(0, 12)}
               quoCalls={db.quoCalls.filter((call) => call.candidateId === selectedCandidate.id)}
+              attachments={db.attachments.filter((attachment) => attachment.candidateId === selectedCandidate.id)}
               updateCandidate={async (candidate, activityText, activityType) => {
                 try {
                   const previousStatus = selectedCandidate.status;
                   await saveCandidate(candidate, activityText, activityType);
                   if (candidate.status !== previousStatus) await createStatusFollowup(candidate.id, candidate.status);
+                  notify("Сохранено");
+                } catch (error) {
+                  notify(error.message);
+                }
+              }}
+              updateAttachmentDocumentType={async (attachment, documentType) => {
+                try {
+                  await updateAttachmentDocumentType(attachment, documentType);
                   notify("Сохранено");
                 } catch (error) {
                   notify(error.message);
@@ -2266,7 +2353,7 @@ function CandidatesView({ db, ui, setUi, openCandidate, editCandidate, startCall
   );
 }
 
-function CandidateProfile({ candidate, activities, quoCalls, updateCandidate, editCandidate, addFollowup, deleteCandidate, startCall }) {
+function CandidateProfile({ candidate, activities, quoCalls, attachments, updateCandidate, updateAttachmentDocumentType, editCandidate, addFollowup, deleteCandidate, startCall }) {
   const { t } = useI18n();
   const progressIndex = Math.max(0, pipelineStatuses.indexOf(candidate.status));
   const progress = Math.min(100, Math.round((progressIndex / (pipelineStatuses.length - 2)) * 100));
@@ -2313,6 +2400,7 @@ function CandidateProfile({ candidate, activities, quoCalls, updateCandidate, ed
             <div className="info-title">{t("documents")}</div>
             <div className="docs-grid">{Object.entries(docLabels).map(([key, label]) => <div className="doc-row" key={key}><strong>{label}</strong><select value={candidate.docs[key] || "not_requested"} onChange={(event) => updateCandidate({ ...candidate, docs: { ...candidate.docs, [key]: event.target.value } }, `${label}: ${event.target.value}`, "document")}>{docStatuses.map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></div>)}</div>
           </div>
+          <CandidateAttachments attachments={attachments || []} onChangeType={updateAttachmentDocumentType} />
           <div className="card card-pad">
             <div className="info-title">Insurance</div>
             <label>Status<select value={candidate.insurance.status} onChange={(event) => updateCandidate({ ...candidate, insurance: { ...candidate.insurance, status: event.target.value } }, `Insurance status: ${event.target.value}`, "insurance")}>{["not_started", "pending", "approved", "rejected"].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
@@ -2325,6 +2413,43 @@ function CandidateProfile({ candidate, activities, quoCalls, updateCandidate, ed
         </div>
       </div>
     </>
+  );
+}
+
+function CandidateAttachments({ attachments, onChangeType }) {
+  const { t } = useI18n();
+
+  return (
+    <div className="card card-pad">
+      <div className="info-title">{t("receivedFiles")}</div>
+      {attachments.length ? (
+        <div className="attachment-list">
+          {attachments.map((attachment) => (
+            <div className="attachment-item" key={attachment.id}>
+              {attachment.mimeType?.startsWith("image/") && attachment.externalUrl ? (
+                <a className="attachment-preview" href={attachment.externalUrl} target="_blank" rel="noreferrer">
+                  <img src={attachment.externalUrl} alt={attachment.fileName || t("receivedFiles")} loading="lazy" />
+                </a>
+              ) : (
+                <a className="attachment-file-icon" href={attachment.externalUrl} target="_blank" rel="noreferrer">↗</a>
+              )}
+              <div className="attachment-body">
+                <div className="attachment-name">{attachment.fileName || t("receivedFromQuo")}</div>
+                <div className="attachment-meta">{[attachment.mimeType, fmtDate(attachment.createdAt, true)].filter(Boolean).join(" · ")}</div>
+                <label className="attachment-select-label">
+                  {t("documentType")}
+                  <select value={attachment.documentType || ""} onChange={(event) => onChangeType(attachment, event.target.value)}>
+                    <option value="">{t("unassignedDocument")}</option>
+                    {Object.entries(docLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                  </select>
+                </label>
+                {attachment.externalUrl ? <a className="attachment-open" href={attachment.externalUrl} target="_blank" rel="noreferrer">{t("openFile")}</a> : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : <div className="section-note">{t("noReceivedFiles")}</div>}
+    </div>
   );
 }
 
@@ -3272,6 +3397,7 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
             <div className="token-row"><div><strong>call.completed</strong><span>Match phone number to candidate</span></div><span className="badge badge-green">required</span></div>
             <div className="token-row"><div><strong>call.summary.completed</strong><span>Import summary and next steps</span></div><span className="badge badge-green">required</span></div>
             <div className="token-row"><div><strong>call.recording.completed</strong><span>Link call recording URL</span></div><span className="badge badge-green">required</span></div>
+            <div className="token-row"><div><strong>message.received</strong><span>Link incoming document photos</span></div><span className="badge badge-green">required</span></div>
           </div>
         </div>
       </div>
