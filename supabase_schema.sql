@@ -313,6 +313,11 @@ create table if not exists public.quo_call_events (
   summary text[] not null default '{}',
   next_steps text[] not null default '{}',
   summary_imported_at timestamptz,
+  recording_url text not null default '',
+  recording_type text not null default '',
+  recording_duration_seconds integer,
+  recording_storage_path text not null default '',
+  recording_imported_at timestamptz,
   raw_payload jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -337,6 +342,11 @@ alter table public.followups add column if not exists workspace_id uuid referenc
 alter table public.activities add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.quo_call_events add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
 alter table public.quo_call_events add column if not exists summary_imported_at timestamptz;
+alter table public.quo_call_events add column if not exists recording_url text not null default '';
+alter table public.quo_call_events add column if not exists recording_type text not null default '';
+alter table public.quo_call_events add column if not exists recording_duration_seconds integer;
+alter table public.quo_call_events add column if not exists recording_storage_path text not null default '';
+alter table public.quo_call_events add column if not exists recording_imported_at timestamptz;
 
 create unique index if not exists idx_app_settings_workspace_id_unique on public.app_settings(workspace_id);
 create index if not exists idx_workspace_webhook_tokens_workspace_id on public.workspace_webhook_tokens(workspace_id);

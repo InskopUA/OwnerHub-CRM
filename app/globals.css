@@ -202,6 +202,12 @@ small { color: var(--muted); }
 .quo-summary-block strong { font-size: 12px; }
 .quo-summary-block ul { margin: 0; padding-left: 18px; display: grid; gap: 5px; }
 .quo-summary-block li { font-size: 13px; line-height: 1.45; }
+.quo-recording { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 9px; }
+.quo-recording-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.quo-recording-head strong { font-size: 12px; }
+.quo-recording-head a { color: var(--ink); font-size: 11px; font-weight: 900; text-decoration: none; border-bottom: 1px solid var(--yellow); }
+.quo-recording audio { width: 100%; height: 38px; }
+.quo-recording-meta { color: var(--muted); font-size: 11px; }
 .docs-grid { display: grid; gap: 9px; }
 .doc-row { display: grid; grid-template-columns: 1fr 132px; gap: 12px; align-items: center; border: 1px solid var(--line); padding: 10px 12px; border-radius: 12px; }
 .doc-row strong { font-size: 12px; }

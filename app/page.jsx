@@ -121,6 +121,8 @@ const interfaceCopy = {
     noQuoSummaries: "Quo summary пока нет.",
     summary: "Summary",
     nextSteps: "Next steps",
+    callRecording: "Call recording",
+    openRecording: "Open recording",
     restrictions: "Ограничения",
     onboardingProgress: "Прогресс онбординга",
     changeStage: "Изменить этап",
@@ -167,7 +169,7 @@ const interfaceCopy = {
     quoSigningSecretNote: "В Quo откройте webhook details → Reveal signing secret и вставьте base64 secret сюда.",
     saveQuoSecret: "Save signing secret",
     quoEvents: "Events to enable",
-    quoEventsNote: "В Quo выберите call.completed и call.summary.completed. Первый ищет кандидата по телефону, второй импортирует summary.",
+    quoEventsNote: "В Quo выберите call.completed, call.summary.completed и call.recording.completed. Система привяжет звонок, summary и запись к кандидату.",
     copyWebhookUrl: "Copy webhook URL",
     close: "Закрыть",
     done: "Готово",
@@ -343,6 +345,8 @@ const interfaceCopy = {
     noQuoSummaries: "No Quo summaries yet.",
     summary: "Summary",
     nextSteps: "Next steps",
+    callRecording: "Call recording",
+    openRecording: "Open recording",
     restrictions: "Restrictions",
     onboardingProgress: "Onboarding Progress",
     changeStage: "Change stage",
@@ -389,7 +393,7 @@ const interfaceCopy = {
     quoSigningSecretNote: "In Quo, open webhook details → Reveal signing secret and paste the base64 secret here.",
     saveQuoSecret: "Save signing secret",
     quoEvents: "Events to enable",
-    quoEventsNote: "In Quo, select call.completed and call.summary.completed. The first matches the candidate by phone; the second imports the summary.",
+    quoEventsNote: "In Quo, select call.completed, call.summary.completed, and call.recording.completed. The system links the call, summary, and recording to the candidate.",
     copyWebhookUrl: "Copy webhook URL",
     close: "Close",
     done: "Done",
@@ -902,6 +906,11 @@ function mapQuoCallEvent(row) {
     completedAt: row.completed_at || "",
     summary: Array.isArray(row.summary) ? row.summary.filter(Boolean) : [],
     nextSteps: Array.isArray(row.next_steps) ? row.next_steps.filter(Boolean) : [],
+    recordingUrl: row.recording_url || "",
+    recordingType: row.recording_type || "",
+    recordingDuration: row.recording_duration_seconds ?? "",
+    recordingStoragePath: row.recording_storage_path || "",
+    recordingImportedAt: row.recording_imported_at || "",
     importedAt: row.summary_imported_at || "",
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -2165,7 +2174,7 @@ function CandidateProfile({ candidate, activities, quoCalls, updateCandidate, ed
   const progressIndex = Math.max(0, pipelineStatuses.indexOf(candidate.status));
   const progress = Math.min(100, Math.round((progressIndex / (pipelineStatuses.length - 2)) * 100));
   const { comments, legacyQuoBlocks } = splitCandidateNotes(candidate.notes);
-  const realQuoCalls = (quoCalls || []).filter((call) => call.summary.length || call.nextSteps.length);
+  const realQuoCalls = (quoCalls || []).filter((call) => call.summary.length || call.nextSteps.length || call.recordingUrl);
   const legacyQuoCalls = realQuoCalls.length ? [] : legacyQuoBlocks.map((block, index) => ({
     id: `legacy_quo_${index}`,
     legacyBlock: block,
@@ -2244,10 +2253,27 @@ function QuoSummarySection({ summaries }) {
               <div className="quo-summary-phone">{[item.fromNumber, item.toNumber].filter(Boolean).join(" -> ") || item.callId}</div>
               {item.summary.length ? <QuoSummaryList title={t("summary")} items={item.summary} /> : null}
               {item.nextSteps.length ? <QuoSummaryList title={t("nextSteps")} items={item.nextSteps} /> : null}
+              {item.recordingUrl ? <QuoRecordingPlayer item={item} /> : null}
             </div>
           ))}
         </div>
       ) : <div className="section-note">{t("noQuoSummaries")}</div>}
+    </div>
+  );
+}
+
+function QuoRecordingPlayer({ item }) {
+  const { t } = useI18n();
+  const duration = item.recordingDuration ? `${Math.round(Number(item.recordingDuration))} sec` : "";
+
+  return (
+    <div className="quo-recording">
+      <div className="quo-recording-head">
+        <strong>{t("callRecording")}</strong>
+        <a href={item.recordingUrl} target="_blank" rel="noreferrer">{t("openRecording")}</a>
+      </div>
+      <audio controls preload="none" src={item.recordingUrl} />
+      <div className="quo-recording-meta">{[item.recordingType, duration].filter(Boolean).join(" · ")}</div>
     </div>
   );
 }
@@ -2925,6 +2951,7 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
           <div className="token-list">
             <div className="token-row"><div><strong>call.completed</strong><span>Match phone number to candidate</span></div><span className="badge badge-green">required</span></div>
             <div className="token-row"><div><strong>call.summary.completed</strong><span>Import summary and next steps</span></div><span className="badge badge-green">required</span></div>
+            <div className="token-row"><div><strong>call.recording.completed</strong><span>Link call recording URL</span></div><span className="badge badge-green">required</span></div>
           </div>
         </div>
       </div>

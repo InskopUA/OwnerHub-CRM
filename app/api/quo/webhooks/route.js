@@ -40,6 +40,11 @@ const safeDate = (value) => {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 };
 
+const toNumberOrNull = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.round(number) : null;
+};
+
 const compactPayload = (body) => JSON.stringify(body);
 
 function timingSafeEqualBase64(a, b) {
@@ -219,6 +224,37 @@ async function applySummaryToCandidate(workspaceId, callId) {
   return { imported: true, candidateId: candidate.id };
 }
 
+async function applyRecordingToCandidate(workspaceId, callId) {
+  const { data: event, error: eventError } = await supabaseAdmin
+    .from("quo_call_events")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("call_id", callId)
+    .maybeSingle();
+  if (eventError) throw eventError;
+  if (!event?.candidate_id || !event.recording_url || event.recording_imported_at) {
+    return { imported: false, candidateId: event?.candidate_id || null };
+  }
+
+  const importedAt = new Date().toISOString();
+  await insertActivity(workspaceId, event.candidate_id, `Quo call recording linked for call ${callId}`);
+
+  const { error: updateError } = await supabaseAdmin
+    .from("quo_call_events")
+    .update({ recording_imported_at: importedAt })
+    .eq("workspace_id", workspaceId)
+    .eq("call_id", callId);
+  if (updateError) throw updateError;
+
+  await supabaseAdmin
+    .from("candidates")
+    .update({ last_contact: event.completed_at || event.answered_at || importedAt })
+    .eq("workspace_id", workspaceId)
+    .eq("id", event.candidate_id);
+
+  return { imported: true, candidateId: event.candidate_id };
+}
+
 async function handleCallCompleted(workspaceId, eventId, body, object) {
   const callId = object?.id || object?.callId || "";
   if (!callId) return { ok: true, ignored: true, reason: "Missing call id" };
@@ -261,7 +297,8 @@ async function handleCallCompleted(workspaceId, eventId, body, object) {
   }
 
   const summaryResult = await applySummaryToCandidate(workspaceId, callId);
-  return { ok: true, callId, matched: Boolean(candidate?.id), candidateId: candidate?.id || null, summaryImported: summaryResult.imported };
+  const recordingResult = await applyRecordingToCandidate(workspaceId, callId);
+  return { ok: true, callId, matched: Boolean(candidate?.id), candidateId: candidate?.id || null, summaryImported: summaryResult.imported, recordingLinked: recordingResult.imported };
 }
 
 async function handleSummaryCompleted(workspaceId, eventId, body, object) {
@@ -299,6 +336,43 @@ async function handleSummaryCompleted(workspaceId, eventId, body, object) {
   return { ok: true, callId, summaryImported: summaryResult.imported, candidateId: summaryResult.candidateId };
 }
 
+async function handleRecordingCompleted(workspaceId, eventId, body, object) {
+  const callId = object?.callId || object?.call_id || object?.id || "";
+  if (!callId) return { ok: true, ignored: true, reason: "Missing call id" };
+
+  const media = Array.isArray(object?.media) ? object.media[0] : object?.media;
+  const recordingUrl = media?.url || object?.recordingUrl || object?.recording_url || object?.url || "";
+  if (!recordingUrl) return { ok: true, ignored: true, callId, reason: "Missing recording URL" };
+
+  const { data: existing, error: existingError } = await supabaseAdmin
+    .from("quo_call_events")
+    .select("candidate_id")
+    .eq("workspace_id", workspaceId)
+    .eq("call_id", callId)
+    .maybeSingle();
+  if (existingError) throw existingError;
+
+  const row = {
+    workspace_id: workspaceId,
+    candidate_id: existing?.candidate_id || null,
+    call_id: callId,
+    event_id: eventId || "",
+    event_type: body?.type || "call.recording.completed",
+    recording_url: recordingUrl,
+    recording_type: media?.type || object?.type || "",
+    recording_duration_seconds: toNumberOrNull(media?.duration || object?.duration),
+    raw_payload: body
+  };
+
+  const { error } = await supabaseAdmin
+    .from("quo_call_events")
+    .upsert(row, { onConflict: "workspace_id,call_id" });
+  if (error) throw error;
+
+  const recordingResult = await applyRecordingToCandidate(workspaceId, callId);
+  return { ok: true, callId, recordingLinked: recordingResult.imported, candidateId: recordingResult.candidateId };
+}
+
 export async function POST(request) {
   try {
     if (!hasSupabaseAdminEnv) {
@@ -326,6 +400,8 @@ export async function POST(request) {
       result = await handleCallCompleted(webhook.workspace_id, body?.id, body, object);
     } else if (body?.type === "call.summary.completed") {
       result = await handleSummaryCompleted(webhook.workspace_id, body?.id, body, object);
+    } else if (body?.type === "call.recording.completed") {
+      result = await handleRecordingCompleted(webhook.workspace_id, body?.id, body, object);
     } else {
       result = { ok: true, ignored: true, eventType: body?.type || "" };
     }
