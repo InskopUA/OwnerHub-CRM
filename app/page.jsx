@@ -1644,6 +1644,9 @@ export default function RecruitingHub() {
       .map(mapQuoLiveCall)
       .filter((call) => !configuredPhoneNumberId || normalizeQuoPhoneId(call.phoneNumberId) === configuredPhoneNumberId);
     setLiveCalls(calls);
+    if (calls.some((call) => call.candidateId && !db.candidates.some((candidate) => candidate.id === call.candidateId))) {
+      loadRemoteData();
+    }
   }
 
   async function addActivity(candidateId, text, type = "note") {

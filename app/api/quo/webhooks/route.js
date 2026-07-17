@@ -54,6 +54,11 @@ const firstText = (...values) => values.find((value) => String(value || "").trim
 
 const compactPayload = (body) => JSON.stringify(body);
 
+const todayISO = () => {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
+
 const normalizeQuoPhoneId = (value) => String(value || "").trim().toLowerCase();
 
 const getObjectPhoneNumberId = (object) =>
@@ -161,6 +166,68 @@ async function insertActivity(workspaceId, candidateId, text, type = "call") {
     text
   });
   if (error) throw error;
+}
+
+async function findOrCreateIncomingCallCandidate(workspaceId, phone, source, receivedAt) {
+  const candidate = await findCandidateByPhone(workspaceId, [phone]);
+  if (candidate?.id) return { candidate, created: false };
+
+  const { data, error } = await supabaseAdmin
+    .from("candidates")
+    .insert({
+      workspace_id: workspaceId,
+      phone: phone || "",
+      source,
+      language: "Russian",
+      status: "new",
+      score: 50,
+      owner_name: "HR Manager",
+      notes: "Created automatically from incoming Quo call.",
+      last_contact: receivedAt || new Date().toISOString()
+    })
+    .select("id, first_name, last_name, phone, notes, status")
+    .single();
+  if (error) throw error;
+
+  await insertActivity(workspaceId, data.id, `Candidate created automatically from incoming Quo call ${phone || ""}`.trim(), "lead");
+  return { candidate: data, created: true };
+}
+
+async function ensureMissedCallFollowup(workspaceId, candidateId, phone) {
+  const { data: existing, error: existingError } = await supabaseAdmin
+    .from("followups")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("candidate_id", candidateId)
+    .eq("status", "open")
+    .ilike("note", "Call back missed incoming call%")
+    .limit(1);
+  if (existingError) throw existingError;
+  if (existing?.length) return false;
+
+  const followupDate = todayISO();
+  const followupId = `fu_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const { error } = await supabaseAdmin.from("followups").insert({
+    id: followupId,
+    workspace_id: workspaceId,
+    candidate_id: candidateId,
+    followup_date: followupDate,
+    followup_time: "10:00",
+    type: "Call",
+    note: `Call back missed incoming call${phone ? ` from ${phone}` : ""}`,
+    status: "open"
+  });
+  if (error) throw error;
+
+  const { error: candidateError } = await supabaseAdmin
+    .from("candidates")
+    .update({ next_follow_up: followupDate })
+    .eq("workspace_id", workspaceId)
+    .eq("id", candidateId);
+  if (candidateError) throw candidateError;
+
+  await insertActivity(workspaceId, candidateId, "Auto follow-up created for missed incoming Quo call", "followup");
+  return true;
 }
 
 const ignoreMissingTable = (error) => {
@@ -332,8 +399,11 @@ async function handleCallRinging(workspaceId, eventId, body, object) {
   const fromNumber = firstText(object?.from, object?.fromNumber, object?.from_number);
   const toNumber = firstText(object?.to, object?.toNumber, object?.to_number);
   const candidatePhone = direction === "outgoing" ? toNumber : fromNumber;
-  const candidate = await findCandidateByPhone(workspaceId, [candidatePhone, fromNumber, toNumber]);
   const startedAt = safeDate(object?.createdAt || object?.startedAt || object?.ringingAt) || new Date().toISOString();
+  const candidateResult = direction === "incoming"
+    ? await findOrCreateIncomingCallCandidate(workspaceId, candidatePhone, "Quo Incoming Call", startedAt)
+    : { candidate: await findCandidateByPhone(workspaceId, [candidatePhone, fromNumber, toNumber]), created: false };
+  const candidate = candidateResult.candidate;
 
   const row = {
     workspace_id: workspaceId,
@@ -356,7 +426,7 @@ async function handleCallRinging(workspaceId, eventId, body, object) {
     .upsert(row, { onConflict: "workspace_id,call_id" });
   if (error) throw error;
 
-  return { ok: true, callId, matched: Boolean(candidate?.id), candidateId: candidate?.id || null };
+  return { ok: true, callId, matched: Boolean(candidate?.id), candidateCreated: candidateResult.created, candidateId: candidate?.id || null };
 }
 
 async function handleCallCompleted(workspaceId, eventId, body, object) {
@@ -369,8 +439,16 @@ async function handleCallCompleted(workspaceId, eventId, body, object) {
   }
 
   const direction = object?.direction || "";
-  const candidatePhone = direction === "outgoing" ? object?.to : direction === "incoming" ? object?.from : "";
-  const candidate = await findCandidateByPhone(workspaceId, [candidatePhone, object?.from, object?.to]);
+  const fromNumber = firstText(object?.from, object?.fromNumber, object?.from_number);
+  const toNumber = firstText(object?.to, object?.toNumber, object?.to_number);
+  const candidatePhone = direction === "outgoing" ? toNumber : direction === "incoming" ? fromNumber : "";
+  const completedAt = safeDate(object?.completedAt || object?.createdAt) || new Date().toISOString();
+  const answeredAt = safeDate(object?.answeredAt);
+  const missedIncomingCall = direction === "incoming" && !answeredAt;
+  const candidateResult = direction === "incoming"
+    ? await findOrCreateIncomingCallCandidate(workspaceId, candidatePhone, missedIncomingCall ? "Quo Missed Call" : "Quo Incoming Call", completedAt)
+    : { candidate: await findCandidateByPhone(workspaceId, [candidatePhone, fromNumber, toNumber]), created: false };
+  const candidate = candidateResult.candidate;
 
   const row = {
     workspace_id: workspaceId,
@@ -378,14 +456,14 @@ async function handleCallCompleted(workspaceId, eventId, body, object) {
     call_id: callId,
     event_id: eventId || "",
     event_type: body?.type || "call.completed",
-    from_number: object?.from || "",
-    to_number: object?.to || "",
+    from_number: fromNumber,
+    to_number: toNumber,
     direction,
     conversation_id: object?.conversationId || "",
     phone_number_id: getObjectPhoneNumberId(object),
     user_id: object?.userId || "",
-    answered_at: safeDate(object?.answeredAt),
-    completed_at: safeDate(object?.completedAt || object?.createdAt),
+    answered_at: answeredAt,
+    completed_at: completedAt,
     raw_payload: body
   };
 
@@ -394,21 +472,37 @@ async function handleCallCompleted(workspaceId, eventId, body, object) {
     .upsert(row, { onConflict: "workspace_id,call_id" });
   if (error) throw error;
 
-  if (candidate?.id && object?.answeredAt) {
+  if (candidate?.id && answeredAt) {
     await supabaseAdmin
       .from("candidates")
       .update({
-        last_contact: safeDate(object.answeredAt),
+        last_contact: answeredAt,
         status: candidate.status === "new" ? "contact_attempted" : candidate.status
       })
       .eq("workspace_id", workspaceId)
       .eq("id", candidate.id);
   }
 
+  if (candidate?.id && missedIncomingCall) {
+    const followupCreated = await ensureMissedCallFollowup(workspaceId, candidate.id, candidatePhone);
+    if (followupCreated) {
+      await insertActivity(workspaceId, candidate.id, `Missed incoming Quo call${candidatePhone ? ` from ${candidatePhone}` : ""}`, "call");
+    }
+  }
+
   const summaryResult = await applySummaryToCandidate(workspaceId, callId);
   const recordingResult = await applyRecordingToCandidate(workspaceId, callId);
-  await closeLiveCall(workspaceId, callId, "completed", safeDate(object?.completedAt || object?.createdAt) || new Date().toISOString());
-  return { ok: true, callId, matched: Boolean(candidate?.id), candidateId: candidate?.id || null, summaryImported: summaryResult.imported, recordingLinked: recordingResult.imported };
+  await closeLiveCall(workspaceId, callId, missedIncomingCall ? "missed" : "completed", completedAt);
+  return {
+    ok: true,
+    callId,
+    matched: Boolean(candidate?.id),
+    candidateCreated: candidateResult.created,
+    missed: missedIncomingCall,
+    candidateId: candidate?.id || null,
+    summaryImported: summaryResult.imported,
+    recordingLinked: recordingResult.imported
+  };
 }
 
 async function handleSummaryCompleted(workspaceId, eventId, body, object) {
