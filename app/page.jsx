@@ -1527,6 +1527,11 @@ function CandidateMiniTable({ candidates, openCandidate }) {
 
 function CandidatesView({ db, ui, setUi, openCandidate, editCandidate, startCall, addFollowup, importCsv, updateStatus }) {
   const query = ui.filters.search.toLowerCase().trim();
+  const stateCounts = {};
+  db.candidates.forEach((candidate) => {
+    if (candidate.state) stateCounts[candidate.state] = (stateCounts[candidate.state] || 0) + 1;
+  });
+  const stateOptions = Object.entries(stateCounts).sort(([stateA], [stateB]) => stateA.localeCompare(stateB));
   const list = db.candidates
     .filter((candidate) => {
       const haystack = [fullName(candidate), candidate.phone, candidate.email, candidate.city, candidate.state, candidate.zip, candidate.truck.make, candidate.truck.model, candidate.trailer.make, candidate.trailer.model].join(" ").toLowerCase();
@@ -1544,7 +1549,7 @@ function CandidatesView({ db, ui, setUi, openCandidate, editCandidate, startCall
       <SectionTitle title="База кандидатов" note={`Найдено: ${list.length} из ${db.candidates.length}`} />
       <div className="toolbar">
         <div className="searchbox"><span>⌕</span><input placeholder="Имя, телефон, город, техника..." value={ui.filters.search} onChange={(event) => setFilter("search", event.target.value)} /></div>
-        <select value={ui.filters.state} onChange={(event) => setFilter("state", event.target.value)}><option value="">Все штаты</option>{states.map((state) => <option key={state}>{state}</option>)}</select>
+        <select value={ui.filters.state} onChange={(event) => setFilter("state", event.target.value)}><option value="">Все штаты</option>{stateOptions.map(([state, count]) => <option key={state} value={state}>{state} ({count})</option>)}</select>
         <select value={ui.filters.work} onChange={(event) => setFilter("work", event.target.value)}><option value="">Local / OTR</option>{["Local", "OTR", "Both", "Not sure"].map((work) => <option key={work}>{work}</option>)}</select>
         <select value={ui.filters.status} onChange={(event) => setFilter("status", event.target.value)}><option value="">Все статусы</option>{statuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
         <button className="btn btn-small btn-primary" onClick={importCsv}>Import CSV</button>
