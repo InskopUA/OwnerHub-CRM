@@ -2022,7 +2022,7 @@ export default function RecruitingHub() {
   async function updateSettings(settings) {
     if (!workspace?.id) {
       notify("Workspace ещё не инициализирован");
-      return;
+      return false;
     }
     const settingsPayload = {
       id: `settings_${workspace.id}`,
@@ -2054,10 +2054,11 @@ export default function RecruitingHub() {
     }
     if (error) {
       notify(error.message);
-      return;
+      return false;
     }
     setDb((current) => ({ ...current, settings: { ...settings, interfaceLanguage: settings.interfaceLanguage || defaultSettings.interfaceLanguage } }));
     notify("Настройки сохранены");
+    return true;
   }
 
   async function updateOfferProfile(offerProfile) {
@@ -3382,9 +3383,31 @@ function callDurationSeconds(call) {
   return Math.max(0, Math.round(Number(call.recordingDuration) || 0));
 }
 
+const settingsDraftKey = (workspaceId) => `ownerhub_settings_draft_${workspaceId}`;
+
+function readSettingsDraft(workspaceId) {
+  if (!workspaceId || typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(settingsDraftKey(workspaceId));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSettingsDraft(workspaceId, settings) {
+  if (!workspaceId || typeof window === "undefined") return;
+  window.sessionStorage.setItem(settingsDraftKey(workspaceId), JSON.stringify(settings));
+}
+
+function clearSettingsDraft(workspaceId) {
+  if (!workspaceId || typeof window === "undefined") return;
+  window.sessionStorage.removeItem(settingsDraftKey(workspaceId));
+}
+
 function SettingsView({ db, workspace, updateSettings, reload }) {
   const { t } = useI18n();
-  const [settings, setSettings] = useState(db.settings);
+  const [settings, setSettingsState] = useState(() => readSettingsDraft(workspace?.id) || db.settings);
   const [tokens, setTokens] = useState([]);
   const [quoWebhook, setQuoWebhook] = useState(null);
   const [quoSigningSecret, setQuoSigningSecret] = useState("");
@@ -3399,9 +3422,15 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
   const visibleQuoToken = quoWebhook?.token_value || generatedQuoToken || "";
   const quoWebhookUrl = visibleQuoToken ? `${quoWebhookBaseUrl}?token=${encodeURIComponent(visibleQuoToken)}` : quoWebhookBaseUrl;
 
+  const setSettingsDraft = (next) => {
+    setSettingsState(next);
+    writeSettingsDraft(workspace?.id, next);
+  };
+
   useEffect(() => {
-    setSettings(db.settings);
-  }, [db.settings]);
+    const draft = readSettingsDraft(workspace?.id);
+    setSettingsState(draft || db.settings);
+  }, [workspace?.id, db.settings]);
 
   useEffect(() => {
     if (!workspace?.id) return;
@@ -3553,15 +3582,20 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
     }
   }
 
+  async function saveSettingsDraft() {
+    const saved = await updateSettings(settings);
+    if (saved) clearSettingsDraft(workspace?.id);
+  }
+
   return (
     <>
       <div className="card card-pad settings">
         <SectionTitle title={t("settingsTitle")} />
-        <div className="settings-row"><div className="settings-copy"><strong>{t("company")}</strong><p>{t("companyNote")}</p></div><input value={settings.companyName} onChange={(event) => setSettings({ ...settings, companyName: event.target.value })} /></div>
-        <div className="settings-row"><div className="settings-copy"><strong>{t("hrName")}</strong><p>{t("hrNameNote")}</p></div><input value={settings.hrName} onChange={(event) => setSettings({ ...settings, hrName: event.target.value })} /></div>
-        <div className="settings-row"><div className="settings-copy"><strong>{t("interfaceLanguage")}</strong><p>{t("interfaceLanguageNote")}</p></div><select value={settings.interfaceLanguage || "ru"} onChange={(event) => setSettings({ ...settings, interfaceLanguage: event.target.value })}><option value="ru">{t("russian")}</option><option value="en">{t("english")}</option></select></div>
+        <div className="settings-row"><div className="settings-copy"><strong>{t("company")}</strong><p>{t("companyNote")}</p></div><input value={settings.companyName} onChange={(event) => setSettingsDraft({ ...settings, companyName: event.target.value })} /></div>
+        <div className="settings-row"><div className="settings-copy"><strong>{t("hrName")}</strong><p>{t("hrNameNote")}</p></div><input value={settings.hrName} onChange={(event) => setSettingsDraft({ ...settings, hrName: event.target.value })} /></div>
+        <div className="settings-row"><div className="settings-copy"><strong>{t("interfaceLanguage")}</strong><p>{t("interfaceLanguageNote")}</p></div><select value={settings.interfaceLanguage || "ru"} onChange={(event) => setSettingsDraft({ ...settings, interfaceLanguage: event.target.value })}><option value="ru">{t("russian")}</option><option value="en">{t("english")}</option></select></div>
         <div className="settings-row"><div className="settings-copy"><strong>{t("sync")}</strong><p>{t("syncNote")}</p></div><button className="btn" onClick={reload}>{t("refreshData")}</button></div>
-        <div className="settings-row"><div className="settings-copy"><strong>{t("save")}</strong><p>{t("saveNote")}</p></div><button className="btn btn-primary" onClick={() => updateSettings(settings)}>{t("save")}</button></div>
+        <div className="settings-row"><div className="settings-copy"><strong>{t("save")}</strong><p>{t("saveNote")}</p></div><button className="btn btn-primary" onClick={saveSettingsDraft}>{t("save")}</button></div>
       </div>
 
       <div className="card card-pad settings mt">
@@ -3625,19 +3659,19 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
         </div>
         <div className="settings-row">
           <div className="settings-copy"><strong>{t("welcomeSms")}</strong><p>{t("welcomeSmsNote")}</p></div>
-          <label className="toggle-row"><input type="checkbox" checked={Boolean(settings.welcomeSmsEnabled)} onChange={(event) => setSettings({ ...settings, welcomeSmsEnabled: event.target.checked })} /> <span>{t("sendWelcomeSms")}</span></label>
+          <label className="toggle-row"><input type="checkbox" checked={Boolean(settings.welcomeSmsEnabled)} onChange={(event) => setSettingsDraft({ ...settings, welcomeSmsEnabled: event.target.checked })} /> <span>{t("sendWelcomeSms")}</span></label>
         </div>
         <div className="settings-row">
           <div className="settings-copy"><strong>{t("quoApiKey")}</strong><p>{t("quoApiKeyNote")}</p></div>
-          <input type="password" value={settings.quoApiKey || ""} onChange={(event) => setSettings({ ...settings, quoApiKey: event.target.value })} placeholder="Quo API key" />
+          <input type="password" value={settings.quoApiKey || ""} onChange={(event) => setSettingsDraft({ ...settings, quoApiKey: event.target.value })} placeholder="Quo API key" />
         </div>
         <div className="settings-row">
           <div className="settings-copy"><strong>{t("quoSmsFrom")}</strong><p>{t("quoSmsFromNote")}</p></div>
-          <input value={settings.quoSmsFrom || ""} onChange={(event) => setSettings({ ...settings, quoSmsFrom: event.target.value })} placeholder="PN..." />
+          <input value={settings.quoSmsFrom || ""} onChange={(event) => setSettingsDraft({ ...settings, quoSmsFrom: event.target.value })} placeholder="PN..." />
         </div>
         <div className="settings-row">
           <div className="settings-copy"><strong>{t("welcomeSmsTemplate")}</strong><p>{t("welcomeSmsTemplateNote")}</p></div>
-          <textarea value={settings.welcomeSmsTemplate || ""} onChange={(event) => setSettings({ ...settings, welcomeSmsTemplate: event.target.value })} />
+          <textarea value={settings.welcomeSmsTemplate || ""} onChange={(event) => setSettingsDraft({ ...settings, welcomeSmsTemplate: event.target.value })} />
         </div>
         <div className="settings-row">
           <div className="settings-copy"><strong>{t("welcomeSmsSetupGuide")}</strong><p>{t("welcomeSmsGuideTest")}</p></div>
