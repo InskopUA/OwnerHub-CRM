@@ -5,7 +5,6 @@ import { hasSupabaseEnv, supabase } from "../lib/supabaseClient";
 import {
   callSteps,
   docLabels,
-  docStatuses,
   pipelineStatuses,
   normalizeCandidateStatus,
   states,
@@ -127,6 +126,9 @@ const interfaceCopy = {
     documentType: "Тип документа",
     unassignedDocument: "Не назначено",
     receivedFromQuo: "Получено из Quo message",
+    addDocument: "Добавить",
+    documentLinkPrompt: "Вставьте ссылку на документ",
+    deleteDocumentConfirm: "Удалить этот документ из карточки?",
     deleteFile: "Удалить файл",
     deleteFileConfirm: "Удалить этот файл из карточки?",
     summary: "Summary",
@@ -388,6 +390,9 @@ const interfaceCopy = {
     documentType: "Document type",
     unassignedDocument: "Unassigned",
     receivedFromQuo: "Received from Quo message",
+    addDocument: "Add",
+    documentLinkPrompt: "Paste document link",
+    deleteDocumentConfirm: "Delete this document from the profile?",
     deleteFile: "Delete file",
     deleteFileConfirm: "Delete this file from the profile?",
     summary: "Summary",
@@ -1683,6 +1688,83 @@ export default function RecruitingHub() {
     }));
   }
 
+  async function addManualDocument(candidate, documentType, externalUrl) {
+    if (!workspace?.id) throw new Error("Workspace не инициализирован");
+    const id = `att_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    const row = {
+      id,
+      workspace_id: workspace.id,
+      candidate_id: candidate.id,
+      source: "manual",
+      message_id: `manual_${id}`,
+      direction: "incoming",
+      document_type: documentType,
+      file_name: docLabels[documentType] || documentType,
+      external_url: externalUrl,
+      raw_payload: {}
+    };
+
+    const { data, error } = await supabase
+      .from("candidate_attachments")
+      .insert(row)
+      .select("*")
+      .single();
+    if (error) throw error;
+
+    const { error: docError } = await supabase
+      .from("candidate_documents")
+      .upsert({
+        workspace_id: workspace.id,
+        candidate_id: candidate.id,
+        document_type: documentType,
+        status: "received"
+      }, { onConflict: "candidate_id,document_type" });
+    if (docError) throw docError;
+
+    await addActivity(candidate.id, `${docLabels[documentType] || documentType}: added manually`, "document");
+    setDb((current) => ({
+      ...current,
+      attachments: [mapCandidateAttachment(data), ...current.attachments],
+      candidates: current.candidates.map((item) => (
+        item.id === candidate.id
+          ? { ...item, docs: { ...item.docs, [documentType]: "received" } }
+          : item
+      ))
+    }));
+  }
+
+  async function deleteCandidateDocument(candidate, documentType) {
+    if (!workspace?.id) throw new Error("Workspace не инициализирован");
+    const { error } = await supabase
+      .from("candidate_attachments")
+      .delete()
+      .eq("workspace_id", workspace.id)
+      .eq("candidate_id", candidate.id)
+      .eq("document_type", documentType);
+    if (error) throw error;
+
+    const { error: docError } = await supabase
+      .from("candidate_documents")
+      .upsert({
+        workspace_id: workspace.id,
+        candidate_id: candidate.id,
+        document_type: documentType,
+        status: "not_requested"
+      }, { onConflict: "candidate_id,document_type" });
+    if (docError) throw docError;
+
+    await addActivity(candidate.id, `${docLabels[documentType] || documentType}: document removed`, "document");
+    setDb((current) => ({
+      ...current,
+      attachments: current.attachments.filter((item) => !(item.candidateId === candidate.id && item.documentType === documentType)),
+      candidates: current.candidates.map((item) => (
+        item.id === candidate.id
+          ? { ...item, docs: { ...item.docs, [documentType]: "not_requested" } }
+          : item
+      ))
+    }));
+  }
+
   async function deleteCandidate(candidateId) {
     const { error } = await supabase.from("candidates").delete().eq("id", candidateId).eq("workspace_id", workspace.id);
     if (error) {
@@ -2043,6 +2125,22 @@ export default function RecruitingHub() {
                   notify(error.message);
                 }
               }}
+              addManualDocument={async (candidate, documentType, externalUrl) => {
+                try {
+                  await addManualDocument(candidate, documentType, externalUrl);
+                  notify("Сохранено");
+                } catch (error) {
+                  notify(error.message);
+                }
+              }}
+              deleteCandidateDocument={async (candidate, documentType) => {
+                try {
+                  await deleteCandidateDocument(candidate, documentType);
+                  notify("Удалено");
+                } catch (error) {
+                  notify(error.message);
+                }
+              }}
               editCandidate={(candidate) => setModal({ type: "candidate", candidate })}
               addFollowup={(candidateId) => setModal({ type: "followup", candidateId })}
               deleteCandidate={deleteCandidate}
@@ -2381,7 +2479,7 @@ function CandidatesView({ db, ui, setUi, openCandidate, editCandidate, startCall
   );
 }
 
-function CandidateProfile({ candidate, activities, quoCalls, attachments, updateCandidate, updateAttachmentDocumentType, deleteAttachment, editCandidate, addFollowup, deleteCandidate, startCall }) {
+function CandidateProfile({ candidate, activities, quoCalls, attachments, updateCandidate, updateAttachmentDocumentType, deleteAttachment, addManualDocument, deleteCandidateDocument, editCandidate, addFollowup, deleteCandidate, startCall }) {
   const { t } = useI18n();
   const progressIndex = Math.max(0, pipelineStatuses.indexOf(candidate.status));
   const progress = Math.min(100, Math.round((progressIndex / (pipelineStatuses.length - 2)) * 100));
@@ -2424,7 +2522,7 @@ function CandidateProfile({ candidate, activities, quoCalls, attachments, update
             <label className="mt-label">{t("changeStage")}<select value={candidate.status} onChange={(event) => updateCandidate({ ...candidate, status: event.target.value, updatedAt: new Date().toISOString() }, `Статус изменён на ${statusLabel(event.target.value, t)}`, "status")}>{localizedStatuses(t).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             <button className="btn btn-primary full" onClick={() => addFollowup(candidate.id)}>＋ {t("addFollowup")}</button>
           </div>
-          <CandidateDocuments candidate={candidate} attachments={attachments || []} updateCandidate={updateCandidate} />
+          <CandidateDocuments candidate={candidate} attachments={attachments || []} addManualDocument={addManualDocument} deleteCandidateDocument={deleteCandidateDocument} />
           <CandidateAttachments attachments={attachments || []} onChangeType={updateAttachmentDocumentType} onDelete={deleteAttachment} />
           <div className="card card-pad">
             <div className="info-title">Insurance</div>
@@ -2441,7 +2539,7 @@ function CandidateProfile({ candidate, activities, quoCalls, attachments, update
   );
 }
 
-function CandidateDocuments({ candidate, attachments, updateCandidate }) {
+function CandidateDocuments({ candidate, attachments, addManualDocument, deleteCandidateDocument }) {
   const { t } = useI18n();
   const attachmentsByType = (attachments || []).reduce((acc, attachment) => {
     if (!attachment.documentType || !attachment.externalUrl) return acc;
@@ -2457,18 +2555,22 @@ function CandidateDocuments({ candidate, attachments, updateCandidate }) {
       <div className="info-title">{t("documents")}</div>
       <div className="docs-grid">
         {Object.entries(docLabels).map(([key, label]) => {
-          const status = candidate.docs[key] || "not_requested";
           const attachment = attachmentsByType[key];
           return (
-            <div className={`doc-row ${status === "received" ? "doc-row-received" : ""}`} key={key}>
+            <div className={`doc-row ${attachment ? "doc-row-received" : ""}`} key={key}>
               {attachment ? (
                 <a className="doc-link" href={attachment.externalUrl} target="_blank" rel="noreferrer">{label}</a>
               ) : (
                 <strong>{label}</strong>
               )}
-              <select value={status} onChange={(event) => updateCandidate({ ...candidate, docs: { ...candidate.docs, [key]: event.target.value } }, `${label}: ${event.target.value}`, "document")}>
-                {docStatuses.map(([value, title]) => <option key={value} value={value}>{title}</option>)}
-              </select>
+              {attachment ? (
+                <button className="btn btn-small btn-danger doc-action" onClick={() => window.confirm(t("deleteDocumentConfirm")) && deleteCandidateDocument(candidate, key)}>{t("delete")}</button>
+              ) : (
+                <button className="btn btn-small doc-action" onClick={() => {
+                  const url = window.prompt(t("documentLinkPrompt"));
+                  if (url?.trim()) addManualDocument(candidate, key, url.trim());
+                }}>{t("addDocument")}</button>
+              )}
             </div>
           );
         })}
