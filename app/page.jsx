@@ -401,6 +401,224 @@ function badgeClass(status) {
   return "badge-gray";
 }
 
+function decodeLeadFile(buffer) {
+  const bytes = new Uint8Array(buffer);
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new globalThis.TextDecoder("utf-16le").decode(bytes.slice(2));
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new globalThis.TextDecoder("utf-16be").decode(bytes.slice(2));
+  if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) return new globalThis.TextDecoder("utf-8").decode(bytes.slice(3));
+  const firstChunk = Array.from(bytes.slice(0, 120));
+  const likelyUtf16Le = firstChunk.filter((byte, index) => index % 2 === 1 && byte === 0).length > 20;
+  return new globalThis.TextDecoder(likelyUtf16Le ? "utf-16le" : "utf-8").decode(bytes);
+}
+
+function detectDelimiter(text) {
+  const header = text.split(/\r?\n/)[0] || "";
+  const tabCount = (header.match(/\t/g) || []).length;
+  const commaCount = (header.match(/,/g) || []).length;
+  const semicolonCount = (header.match(/;/g) || []).length;
+  if (tabCount >= commaCount && tabCount >= semicolonCount && tabCount > 0) return "\t";
+  if (semicolonCount > commaCount) return ";";
+  return ",";
+}
+
+function parseDelimitedText(text, delimiter) {
+  const rows = [];
+  let row = [];
+  let value = "";
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+
+    if (char === "\"") {
+      if (quoted && next === "\"") {
+        value += "\"";
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+      continue;
+    }
+
+    if (!quoted && char === delimiter) {
+      row.push(value);
+      value = "";
+      continue;
+    }
+
+    if (!quoted && (char === "\n" || char === "\r")) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(value);
+      if (row.some((cell) => cell.trim() !== "")) rows.push(row);
+      row = [];
+      value = "";
+      continue;
+    }
+
+    value += char;
+  }
+
+  row.push(value);
+  if (row.some((cell) => cell.trim() !== "")) rows.push(row);
+  return rows;
+}
+
+function normalizeLeadKey(key) {
+  return String(key || "")
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function cleanLeadValue(value) {
+  return String(value || "")
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .replace(/^p:/i, "")
+    .trim();
+}
+
+function normalizeImportedPhone(value) {
+  return cleanLeadValue(value).replace(/[^\d+]/g, "");
+}
+
+function normalizeImportedEmail(value) {
+  return cleanLeadValue(value).toLowerCase();
+}
+
+function importedPhoneKey(value) {
+  return cleanLeadValue(value).replace(/\D/g, "");
+}
+
+function findImportedValue(row, aliases) {
+  const aliasSet = new Set(aliases.map(normalizeLeadKey));
+  const match = row.find((field) => aliasSet.has(field.key));
+  return cleanLeadValue(match?.value);
+}
+
+function findImportedValueByPattern(row, patterns) {
+  const match = row.find((field) => patterns.some((pattern) => field.key.includes(pattern)));
+  return cleanLeadValue(match?.value);
+}
+
+function parseLeadName(name) {
+  const cleaned = cleanLeadValue(name);
+  if (!cleaned) return { firstName: "", lastName: "" };
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  return {
+    firstName: parts[0] || "",
+    lastName: parts.slice(1).join(" ")
+  };
+}
+
+function detectLanguageFromRow(row) {
+  const text = row.map((field) => `${field.rawKey} ${field.value}`).join(" ");
+  if (/[а-яіїєґ]/i.test(text)) return "Russian";
+  return "English";
+}
+
+function mapFacebookLeadRow(row, fileName) {
+  const fullNameValue = findImportedValue(row, ["full_name", "full name", "name", "имя", "фио", "полное имя"]);
+  const firstNameValue = findImportedValue(row, ["first_name", "first name", "first"]);
+  const lastNameValue = findImportedValue(row, ["last_name", "last name", "last"]);
+  const parsedName = parseLeadName(fullNameValue);
+  const position = findImportedValueByPattern(row, ["position", "позицию", "подаетесь"]);
+  const experience = findImportedValueByPattern(row, ["experience", "опыт"]);
+  const equipment = findImportedValueByPattern(row, ["equipment", "оборудования"]);
+  const leadId = findImportedValue(row, ["id", "lead_id", "lead id"]);
+  const formName = findImportedValue(row, ["form_name", "form name"]);
+  const campaignName = findImportedValue(row, ["campaign_name", "campaign name"]);
+  const adsetName = findImportedValue(row, ["adset_name", "adset name"]);
+  const adName = findImportedValue(row, ["ad_name", "ad name"]);
+  const createdTime = findImportedValue(row, ["created_time", "created time"]);
+  const usedKeys = new Set([
+    "id", "lead_id", "created_time", "ad_id", "ad_name", "adset_id", "adset_name", "campaign_id", "campaign_name",
+    "form_id", "form_name", "is_organic", "platform", "full_name", "first_name", "last_name", "phone_number",
+    "phone", "email", "city", "state", "zip", "postal_code", "work_preference", "truck_make", "truck_model",
+    "truck_year", "trailer_make", "trailer_model", "trailer_year"
+  ]);
+
+  const notes = [
+    `Imported from Facebook CSV: ${fileName}`,
+    leadId ? `Facebook lead ID: ${leadId}` : "",
+    createdTime ? `Created time: ${createdTime}` : "",
+    formName ? `Form: ${formName}` : "",
+    campaignName ? `Campaign: ${campaignName}` : "",
+    adsetName ? `Ad set: ${adsetName}` : "",
+    adName ? `Ad: ${adName}` : "",
+    position ? `Position answer: ${position}` : "",
+    experience ? `Experience answer: ${experience}` : "",
+    equipment ? `Equipment answer: ${equipment}` : ""
+  ].filter(Boolean);
+
+  const extraAnswers = row
+    .filter((field) => field.value && !usedKeys.has(field.key) && !["position", "позицию", "подаетесь", "experience", "опыт", "equipment", "оборудования"].some((pattern) => field.key.includes(pattern)))
+    .map((field) => `${field.rawKey}: ${cleanLeadValue(field.value)}`);
+  if (extraAnswers.length) notes.push(`Form answers:\n${extraAnswers.join("\n")}`);
+
+  const candidate = blankCandidate();
+  const phone = normalizeImportedPhone(findImportedValue(row, ["phone_number", "phone number", "phone", "телефон", "номер телефона"]));
+  const email = normalizeImportedEmail(findImportedValue(row, ["email", "e-mail", "почта"]));
+  candidate.firstName = firstNameValue || parsedName.firstName;
+  candidate.lastName = lastNameValue || parsedName.lastName;
+  candidate.phone = phone;
+  candidate.email = email;
+  candidate.language = detectLanguageFromRow(row);
+  candidate.source = formName ? `Facebook CSV - ${formName}` : "Facebook CSV";
+  candidate.city = findImportedValue(row, ["city", "город"]);
+  candidate.state = findImportedValue(row, ["state", "штат"]);
+  candidate.zip = findImportedValue(row, ["zip", "postal_code", "postal code", "zipcode"]);
+  candidate.workPreference = findImportedValue(row, ["work_preference", "work preference", "local_or_otr"]) || (/local/i.test(position) ? "Local" : "");
+  candidate.truck.make = findImportedValue(row, ["truck_make", "truck make"]);
+  candidate.truck.model = findImportedValue(row, ["truck_model", "truck model"]);
+  candidate.truck.year = findImportedValue(row, ["truck_year", "truck year"]);
+  candidate.trailer.make = findImportedValue(row, ["trailer_make", "trailer make"]);
+  candidate.trailer.model = findImportedValue(row, ["trailer_model", "trailer model"]);
+  candidate.trailer.year = findImportedValue(row, ["trailer_year", "trailer year"]);
+  if (equipment && !candidate.truck.make && !candidate.truck.model) candidate.truck.model = equipment;
+  candidate.twoCarExperience = experience;
+  candidate.notes = notes.join("\n");
+  candidate.tags = ["facebook", "csv-import"];
+  candidate.createdAt = createdTime && !Number.isNaN(new Date(createdTime).getTime()) ? new Date(createdTime).toISOString() : candidate.createdAt;
+  candidate.updatedAt = new Date().toISOString();
+
+  return candidate.firstName || candidate.lastName || candidate.phone || candidate.email || candidate.notes ? candidate : null;
+}
+
+function parseFacebookLeadsText(text, fileName) {
+  const delimiter = detectDelimiter(text);
+  const rows = parseDelimitedText(text, delimiter);
+  const headers = rows[0]?.map((header) => String(header || "").replace(/^\uFEFF/, "").trim()) || [];
+  return rows.slice(1).map((cells) => {
+    const row = headers.map((header, index) => ({
+      rawKey: header,
+      key: normalizeLeadKey(header),
+      value: cells[index] || ""
+    }));
+    return mapFacebookLeadRow(row, fileName);
+  }).filter(Boolean);
+}
+
+function mergeImportedCandidate(existing, imported) {
+  const next = structuredClone(existing);
+  const assign = (key) => {
+    if (imported[key]) next[key] = imported[key];
+  };
+  ["firstName", "lastName", "phone", "email", "language", "source", "city", "state", "zip", "workPreference", "twoCarExperience"].forEach(assign);
+  ["make", "model", "year"].forEach((key) => {
+    if (imported.truck[key]) next.truck[key] = imported.truck[key];
+    if (imported.trailer[key]) next.trailer[key] = imported.trailer[key];
+  });
+  const notes = [next.notes, imported.notes].filter(Boolean);
+  next.notes = Array.from(new Set(notes)).join("\n\n");
+  next.tags = Array.from(new Set([...(next.tags || []), ...(imported.tags || [])]));
+  next.updatedAt = new Date().toISOString();
+  return next;
+}
+
 function scoreClass(score) {
   if (score >= 80) return "green";
   if (score >= 55) return "yellow";
@@ -821,6 +1039,54 @@ export default function RecruitingHub() {
     }
   }
 
+  async function importCsvFiles(files) {
+    if (!files.length) throw new Error("Выберите хотя бы один CSV файл");
+    const phoneIndex = new Map();
+    const emailIndex = new Map();
+    db.candidates.forEach((candidate) => {
+      const phoneKey = importedPhoneKey(candidate.phone);
+      const emailKey = normalizeImportedEmail(candidate.email);
+      if (phoneKey) phoneIndex.set(phoneKey, candidate);
+      if (emailKey) emailIndex.set(emailKey, candidate);
+    });
+
+    const summary = { files: files.length, parsed: 0, created: 0, updated: 0, skipped: 0 };
+    for (const file of files) {
+      const text = decodeLeadFile(await file.arrayBuffer());
+      const importedCandidates = parseFacebookLeadsText(text, file.name);
+      summary.parsed += importedCandidates.length;
+
+      for (const imported of importedCandidates) {
+        const phoneKey = importedPhoneKey(imported.phone);
+        const emailKey = normalizeImportedEmail(imported.email);
+        const existing = (phoneKey && phoneIndex.get(phoneKey)) || (emailKey && emailIndex.get(emailKey));
+        const next = existing ? mergeImportedCandidate(existing, imported) : imported;
+
+        if (!next.phone && !next.email && !next.firstName && !next.lastName) {
+          summary.skipped += 1;
+          continue;
+        }
+
+        const saved = await saveCandidate(
+          next,
+          existing ? `CSV import обновил лида из ${file.name}` : `CSV import создал лида из ${file.name}`,
+          existing ? "edit" : "create"
+        );
+
+        if (phoneKey) phoneIndex.set(phoneKey, saved);
+        if (emailKey) emailIndex.set(emailKey, saved);
+
+        if (existing) {
+          summary.updated += 1;
+        } else {
+          summary.created += 1;
+          await createNewLeadFollowup(saved.id);
+        }
+      }
+    }
+    return summary;
+  }
+
   async function saveKnowledgeItem(item) {
     if (!workspace?.id) throw new Error("Workspace не инициализирован");
     const row = {
@@ -961,6 +1227,7 @@ export default function RecruitingHub() {
               editCandidate={(candidate) => setModal({ type: "candidate", candidate })}
               startCall={(candidateId) => setUi((current) => ({ ...current, view: "calls", callCandidateId: candidateId }))}
               addFollowup={(candidateId) => setModal({ type: "followup", candidateId })}
+              importCsv={() => setModal({ type: "csvImport" })}
               updateStatus={updateCandidateStatus}
             />
           )}
@@ -1071,6 +1338,16 @@ export default function RecruitingHub() {
             } catch (error) {
               notify(error.message);
             }
+          }}
+        />
+      )}
+      {modal?.type === "csvImport" && (
+        <CsvImportModal
+          onClose={() => setModal(null)}
+          onImport={async (files) => {
+            const result = await importCsvFiles(files);
+            notify(`CSV импорт: создано ${result.created}, обновлено ${result.updated}`);
+            return result;
           }}
         />
       )}
@@ -1213,7 +1490,7 @@ function CandidateMiniTable({ candidates, openCandidate }) {
   );
 }
 
-function CandidatesView({ db, ui, setUi, openCandidate, editCandidate, startCall, addFollowup, updateStatus }) {
+function CandidatesView({ db, ui, setUi, openCandidate, editCandidate, startCall, addFollowup, importCsv, updateStatus }) {
   const query = ui.filters.search.toLowerCase().trim();
   const list = db.candidates
     .filter((candidate) => {
@@ -1235,6 +1512,7 @@ function CandidatesView({ db, ui, setUi, openCandidate, editCandidate, startCall
         <select value={ui.filters.state} onChange={(event) => setFilter("state", event.target.value)}><option value="">Все штаты</option>{states.map((state) => <option key={state}>{state}</option>)}</select>
         <select value={ui.filters.work} onChange={(event) => setFilter("work", event.target.value)}><option value="">Local / OTR</option>{["Local", "OTR", "Both", "Not sure"].map((work) => <option key={work}>{work}</option>)}</select>
         <select value={ui.filters.status} onChange={(event) => setFilter("status", event.target.value)}><option value="">Все статусы</option>{statuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        <button className="btn btn-small btn-primary" onClick={importCsv}>Import CSV</button>
         <button className="btn btn-small" onClick={() => setUi((current) => ({ ...current, filters: { search: "", state: "", status: "", work: "" } }))}>Сбросить</button>
       </div>
       {list.length ? (
@@ -2077,6 +2355,71 @@ function LocationFields({ draft, setDraft }) {
       <label>State<select name="state" value={draft.state} onChange={(event) => setDraft((current) => ({ ...current, state: event.target.value }))}><option value="">Выберите</option>{states.map((state) => <option key={state}>{state}</option>)}</select></label>
       <label>ZIP<input name="zip" inputMode="numeric" value={draft.zip} onChange={(event) => setDraft((current) => ({ ...current, zip: event.target.value.replace(/\D/g, "").slice(0, 5) }))} />{zipStatus ? <span className={`field-hint ${zipStatus.includes("not") ? "error" : ""}`}>{zipStatus}</span> : null}</label>
     </>
+  );
+}
+
+function CsvImportModal({ onClose, onImport }) {
+  const [files, setFiles] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+
+  const runImport = async () => {
+    setBusy(true);
+    setError("");
+    setResult(null);
+    try {
+      const summary = await onImport(files);
+      setResult(summary);
+    } catch (importError) {
+      setError(importError.message || "Не удалось импортировать CSV");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal">
+        <div className="modal-head"><strong>Import Facebook CSV</strong><button className="btn icon-btn" onClick={onClose}>×</button></div>
+        <div className="modal-body">
+          <div className="import-panel">
+            <label className="field-span">
+              CSV файлы из Facebook Leads
+              <input
+                type="file"
+                accept=".csv,text/csv,.tsv,text/tab-separated-values"
+                multiple
+                onChange={(event) => setFiles(Array.from(event.target.files || []))}
+              />
+            </label>
+            <div className="section-note">
+              Можно выбрать несколько файлов сразу. Система читает UTF-8 и Facebook UTF-16 TSV, создаёт новых лидов и обновляет существующих по телефону или email.
+            </div>
+            {files.length ? (
+              <div className="import-file-list">
+                {files.map((file) => <div key={`${file.name}-${file.size}`}>{file.name}<span>{Math.max(1, Math.round(file.size / 1024))} KB</span></div>)}
+              </div>
+            ) : null}
+            {result ? (
+              <div className="import-result">
+                <strong>Готово</strong>
+                <span>Файлов: {result.files}</span>
+                <span>Строк прочитано: {result.parsed}</span>
+                <span>Создано: {result.created}</span>
+                <span>Обновлено: {result.updated}</span>
+                <span>Пропущено: {result.skipped}</span>
+              </div>
+            ) : null}
+            {error ? <div className="field-hint error">{error}</div> : null}
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn" onClick={onClose}>Закрыть</button>
+          <button className="btn btn-primary" disabled={!files.length || busy} onClick={runImport}>{busy ? "Импортируем..." : "Импортировать"}</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
