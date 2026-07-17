@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { hasSupabaseEnv, supabase } from "../lib/supabaseClient";
 import {
   callSteps,
@@ -17,6 +17,7 @@ const defaultSettings = {
   companyName: "Sofia Logistics LLC",
   hubName: "OwnerHub HRM",
   hrName: "HR Manager",
+  interfaceLanguage: "ru",
   defaultScriptLanguage: "ru",
   offerProfile: {
     targetRole: "Owner-Operator with open 2-car trailer",
@@ -35,6 +36,441 @@ const defaultSettings = {
     otrPitch: "OTR usually means more miles and potentially higher total gross, with more time on the road."
   }
 };
+
+const interfaceCopy = {
+  ru: {
+    dashboard: "Dashboard",
+    candidates: "Кандидаты",
+    calls: "Скрипт звонка",
+    pipeline: "Воронка",
+    followups: "Follow-ups",
+    settings: "Настройки",
+    logout: "Выйти",
+    connected: "Supabase подключён",
+    newCandidate: "Новый кандидат",
+    addFollowup: "Follow-up",
+    loadingData: "Загружаем данные...",
+    checkingSession: "Проверяем сессию...",
+    pageCandidateTitle: "Карточка кандидата",
+    pageCandidateSubtitle: "Полный профиль, документы и путь онбординга",
+    pageDashboardSubtitle: "",
+    pageCandidatesSubtitle: "Единая база лидов и водителей",
+    pageCallsSubtitle: "База знаний и интерактивный помощник HR",
+    pagePipelineSubtitle: "Перемещайте кандидатов между этапами",
+    pageFollowupsSubtitle: "План контактов и напоминаний",
+    pageSettingsSubtitle: "Supabase, Vercel и параметры системы",
+    totalCandidates: "Всего кандидатов",
+    fullLeadBase: "Полная база лидов",
+    inProgress: "В работе",
+    qualifiedAndStages: "Квалифицированы и проходят этапы",
+    followupsToday: "Follow-ups сегодня",
+    requireContactToday: "Требуют контакта сегодня",
+    activeDrivers: "Активные водители",
+    startedWork: "Успешно начали работу",
+    pipelineByStatus: "Воронка по статусам",
+    pipelineByStatusNote: "Быстрый обзор всей базы по этапам",
+    allLeads: "Все лиды",
+    percentBase: "{{percent}}% базы",
+    recentCandidates: "Последние кандидаты",
+    recentCandidatesNote: "Недавно добавленные и обновлённые лиды",
+    noCandidatesYet: "Кандидатов пока нет",
+    addFirstLead: "Добавьте первый лид, чтобы начать работу.",
+    upcomingTasks: "Ближайшие задачи HR",
+    noOpenFollowups: "Нет открытых follow-ups",
+    contactsDone: "Все контакты обработаны.",
+    candidatesByState: "Кандидаты по штатам",
+    currentGeography: "География текущей базы",
+    workFormatDistribution: "Распределение по формату",
+    workFormatNote: "Local, OTR и универсальные кандидаты",
+    candidate: "Кандидат",
+    location: "Локация",
+    format: "Формат",
+    status: "Статус",
+    score: "Score",
+    candidateBase: "База кандидатов",
+    foundCount: "Найдено: {{shown}} из {{total}}",
+    searchCandidates: "Имя, телефон, город, техника...",
+    allStates: "Все штаты",
+    allStatuses: "Все статусы",
+    reset: "Сбросить",
+    importCsv: "Import CSV",
+    work: "Работа",
+    equipment: "Техника",
+    nextContact: "Следующий контакт",
+    quickActions: "Quick actions",
+    script: "Скрипт",
+    noResults: "Ничего не найдено",
+    changeFilters: "Измените фильтры или добавьте нового кандидата.",
+    contactPreferences: "Контакт и предпочтения",
+    phone: "Телефон",
+    email: "Email",
+    language: "Язык",
+    source: "Источник",
+    homeTime: "Home time",
+    readyToStart: "Готов начать",
+    daysPerWeek: "Дней в неделю",
+    expectedGross: "Ожидаемый gross",
+    driver: "Водитель",
+    experience: "Общий опыт",
+    accidents: "Аварии",
+    violations: "Нарушения",
+    insuranceRejection: "Отказ страховой ранее",
+    comments: "Комментарии",
+    noComments: "Комментариев пока нет.",
+    restrictions: "Ограничения",
+    onboardingProgress: "Прогресс онбординга",
+    changeStage: "Изменить этап",
+    documents: "Документы",
+    activityHistory: "История активности",
+    emptyHistory: "История пока пуста.",
+    edit: "Редактировать",
+    delete: "Удалить",
+    deleteCandidate: "Удалить кандидата?",
+    callScript: "Скрипт звонка",
+    settingsTitle: "Настройки",
+    company: "Компания",
+    companyNote: "Используется в скрипте звонка.",
+    hrName: "HR name",
+    hrNameNote: "Подставляется в начало звонка.",
+    interfaceLanguage: "Язык интерфейса",
+    interfaceLanguageNote: "Меняет язык меню, таблиц, карточек и настроек.",
+    russian: "Русский",
+    english: "English",
+    sync: "Синхронизация",
+    syncNote: "Перезагрузить данные.",
+    refreshData: "Обновить данные",
+    save: "Сохранить",
+    saveNote: "Записать настройки.",
+    instruction: "Инструкция",
+    webhookUrlNote: "Этот URL вставляется в HTTP module в Make.",
+    personalToken: "Personal token",
+    personalTokenNote: "При генерации нового токена старые токены удаляются. В Make должен использоваться только текущий token.",
+    creating: "Создаём...",
+    generateToken: "Generate new token",
+    currentToken: "Current token",
+    currentTokenNote: "Этот token можно копировать в любое время. Хранится только внутри текущего workspace.",
+    tokenMissing: "Token ещё не создан",
+    copyToken: "Copy token",
+    tokenStatus: "Token status",
+    tokenStatusNote: "В системе должен быть только один активный token. Новый token автоматически заменяет старый.",
+    noTokens: "Токены ещё не созданы.",
+    close: "Закрыть",
+    done: "Готово",
+    cancel: "Отмена",
+    add: "Добавить",
+    firstName: "Имя",
+    lastName: "Фамилия",
+    notSelected: "Не выбран",
+    notSpecified: "Не указан",
+    startDate: "Дата старта",
+    note: "Комментарий",
+    newCandidateModal: "Новый кандидат",
+    editCandidateModal: "Редактировать кандидата",
+    newFollowup: "Новый follow-up",
+    date: "Дата",
+    time: "Время",
+    type: "Тип",
+    chooseCandidate: "Выберите кандидата",
+    whatToDo: "Что нужно сделать или уточнить",
+    noContact: "Нет контакта",
+    deletedCandidate: "Кандидат удалён",
+    noComment: "Без комментария"
+    ,
+    status_new: "Новый лид",
+    status_contact_attempted: "Контакт",
+    status_qualified: "Квалифицирован",
+    status_docs_requested: "Документы",
+    status_quote_pending: "Страховка",
+    status_agreement_sent: "Договор",
+    status_safety_onboarding: "Онбординг",
+    status_active: "Активный водитель",
+    status_lost: "Потерян",
+    loginTitle: "OwnerHub HRM",
+    loginSubtitle: "Войдите в Supabase аккаунт, чтобы открыть базу кандидатов.",
+    password: "Password",
+    wait: "Подождите...",
+    login: "Войти",
+    signup: "Создать аккаунт",
+    createUser: "Создать нового пользователя",
+    alreadyHaveAccount: "Уже есть аккаунт",
+    overdue: "Просрочено",
+    today: "Сегодня",
+    upcoming: "Предстоящие",
+    openTasks: "Открытых задач: {{count}}",
+    taskPlan: "План контактов",
+    noTasks: "Нет задач",
+    csvTitle: "Import Facebook CSV",
+    csvFiles: "CSV файлы из Facebook Leads",
+    csvHint: "Можно выбрать несколько файлов сразу. Система читает UTF-8 и Facebook UTF-16 TSV, создаёт новых лидов и обновляет существующих по телефону или email.",
+    csvReady: "Готово",
+    csvFileCount: "Файлов: {{count}}",
+    csvRows: "Строк прочитано: {{count}}",
+    csvCreated: "Создано: {{count}}",
+    csvUpdated: "Обновлено: {{count}}",
+    csvSkipped: "Пропущено: {{count}}",
+    importing: "Импортируем...",
+    importAction: "Импортировать"
+    ,
+    knowledgeBase: "База знаний для звонков",
+    knowledgeBaseNote: "Скрипты, условия, ответы на возражения и процесс онбординга. Можно редактировать под компанию.",
+    searchKnowledge: "Поиск по скриптам, terms, objections...",
+    allCategories: "Все категории",
+    noKnowledgeFound: "Материалов не найдено",
+    adjustKnowledgeSearch: "Измените поиск или добавьте первый материал базы знаний.",
+    startCall: "Начать звонок",
+    noCallCandidates: "Нет кандидатов для звонка.",
+    howToUse: "Как использовать",
+    knowledgeTip: "Держите здесь живую базу ответов: rates, insurance, документы, objection handling, follow-up wording. HR может быстро найти ответ во время звонка и обновить материал после новых кейсов.",
+    recommendedBlocks: "Рекомендуемые блоки скрипта",
+    noRecommendations: "Нет рекомендаций для текущего шага.",
+    qualificationCall: "Квалификационный звонок",
+    step: "шаг",
+    callResultReady: "Результат готов к сохранению.",
+    checkSummaryFinish: "Проверьте live summary и завершите звонок.",
+    saveContinue: "Сохранить и продолжить",
+    finishSave: "Завершить и сохранить",
+    chooseAnswer: "Выберите ответ кандидата",
+    liveNotes: "Заметки во время звонка",
+    liveNotesPlaceholder: "Свободные комментарии...",
+    choose: "Выберите",
+    liveSummaryLocation: "Локация",
+    callLanguageUpdated: "Язык звонка обновлён"
+    ,
+    newKnowledge: "Новый материал базы знаний",
+    editKnowledge: "Редактировать материал",
+    title: "Название",
+    category: "Категория",
+    order: "Порядок",
+    content: "Содержание",
+    knowledgeTitlePlaceholder: "Например: Возражение по insurance",
+    knowledgeContentPlaceholder: "Текст, который HR может использовать во время звонка..."
+  },
+  en: {
+    dashboard: "Dashboard",
+    candidates: "Candidates",
+    calls: "Call Script",
+    pipeline: "Pipeline",
+    followups: "Follow-ups",
+    settings: "Settings",
+    logout: "Log out",
+    connected: "Supabase connected",
+    newCandidate: "New Candidate",
+    addFollowup: "Follow-up",
+    loadingData: "Loading data...",
+    checkingSession: "Checking session...",
+    pageCandidateTitle: "Candidate Profile",
+    pageCandidateSubtitle: "Full profile, documents, and onboarding path",
+    pageDashboardSubtitle: "",
+    pageCandidatesSubtitle: "Unified lead and driver database",
+    pageCallsSubtitle: "Knowledge base and interactive HR assistant",
+    pagePipelineSubtitle: "Move candidates between stages",
+    pageFollowupsSubtitle: "Contact plan and reminders",
+    pageSettingsSubtitle: "Supabase, Vercel, and system settings",
+    totalCandidates: "Total Candidates",
+    fullLeadBase: "Complete lead database",
+    inProgress: "In Progress",
+    qualifiedAndStages: "Qualified and moving through stages",
+    followupsToday: "Follow-ups Today",
+    requireContactToday: "Need contact today",
+    activeDrivers: "Active Drivers",
+    startedWork: "Successfully started work",
+    pipelineByStatus: "Pipeline by Status",
+    pipelineByStatusNote: "Quick overview of the whole database by stage",
+    allLeads: "All Leads",
+    percentBase: "{{percent}}% of base",
+    recentCandidates: "Recent Candidates",
+    recentCandidatesNote: "Recently added and updated leads",
+    noCandidatesYet: "No candidates yet",
+    addFirstLead: "Add the first lead to start working.",
+    upcomingTasks: "Upcoming HR tasks",
+    noOpenFollowups: "No open follow-ups",
+    contactsDone: "All contacts are handled.",
+    candidatesByState: "Candidates by State",
+    currentGeography: "Current database geography",
+    workFormatDistribution: "Work Format Distribution",
+    workFormatNote: "Local, OTR, and flexible candidates",
+    candidate: "Candidate",
+    location: "Location",
+    format: "Format",
+    status: "Status",
+    score: "Score",
+    candidateBase: "Candidate Database",
+    foundCount: "Found: {{shown}} of {{total}}",
+    searchCandidates: "Name, phone, city, equipment...",
+    allStates: "All States",
+    allStatuses: "All Statuses",
+    reset: "Reset",
+    importCsv: "Import CSV",
+    work: "Work",
+    equipment: "Equipment",
+    nextContact: "Next Contact",
+    quickActions: "Quick actions",
+    script: "Script",
+    noResults: "Nothing found",
+    changeFilters: "Change filters or add a new candidate.",
+    contactPreferences: "Contact and Preferences",
+    phone: "Phone",
+    email: "Email",
+    language: "Language",
+    source: "Source",
+    homeTime: "Home time",
+    readyToStart: "Ready to start",
+    daysPerWeek: "Days per week",
+    expectedGross: "Expected gross",
+    driver: "Driver",
+    experience: "Experience",
+    accidents: "Accidents",
+    violations: "Violations",
+    insuranceRejection: "Previous insurance rejection",
+    comments: "Comments",
+    noComments: "No comments yet.",
+    restrictions: "Restrictions",
+    onboardingProgress: "Onboarding Progress",
+    changeStage: "Change stage",
+    documents: "Documents",
+    activityHistory: "Activity History",
+    emptyHistory: "No activity yet.",
+    edit: "Edit",
+    delete: "Delete",
+    deleteCandidate: "Delete candidate?",
+    callScript: "Call Script",
+    settingsTitle: "Settings",
+    company: "Company",
+    companyNote: "Used in the call script.",
+    hrName: "HR name",
+    hrNameNote: "Inserted at the beginning of the call.",
+    interfaceLanguage: "Interface Language",
+    interfaceLanguageNote: "Changes the language of menus, tables, cards, and settings.",
+    russian: "Русский",
+    english: "English",
+    sync: "Sync",
+    syncNote: "Reload data.",
+    refreshData: "Refresh data",
+    save: "Save",
+    saveNote: "Save settings.",
+    instruction: "Guide",
+    webhookUrlNote: "Paste this URL into the HTTP module in Make.",
+    personalToken: "Personal token",
+    personalTokenNote: "Generating a new token deletes old tokens. Make should use only the current token.",
+    creating: "Creating...",
+    generateToken: "Generate new token",
+    currentToken: "Current token",
+    currentTokenNote: "You can copy this token anytime. It is stored only inside the current workspace.",
+    tokenMissing: "Token has not been created yet",
+    copyToken: "Copy token",
+    tokenStatus: "Token status",
+    tokenStatusNote: "There should be only one active token. A new token automatically replaces the old one.",
+    noTokens: "No tokens created yet.",
+    close: "Close",
+    done: "Done",
+    cancel: "Cancel",
+    add: "Add",
+    firstName: "First name",
+    lastName: "Last name",
+    notSelected: "Not selected",
+    notSpecified: "Not specified",
+    startDate: "Start date",
+    note: "Comment",
+    newCandidateModal: "New Candidate",
+    editCandidateModal: "Edit Candidate",
+    newFollowup: "New follow-up",
+    date: "Date",
+    time: "Time",
+    type: "Type",
+    chooseCandidate: "Choose candidate",
+    whatToDo: "What should be done or clarified",
+    noContact: "No contact",
+    deletedCandidate: "Candidate deleted",
+    noComment: "No comment",
+    status_new: "New Lead",
+    status_contact_attempted: "Contacting",
+    status_qualified: "Qualified",
+    status_docs_requested: "Documents",
+    status_quote_pending: "Insurance",
+    status_agreement_sent: "Agreement",
+    status_safety_onboarding: "Onboarding",
+    status_active: "Active Driver",
+    status_lost: "Lost",
+    loginTitle: "OwnerHub HRM",
+    loginSubtitle: "Sign in to your Supabase account to open the candidate database.",
+    password: "Password",
+    wait: "Please wait...",
+    login: "Log in",
+    signup: "Create account",
+    createUser: "Create new user",
+    alreadyHaveAccount: "Already have an account",
+    overdue: "Overdue",
+    today: "Today",
+    upcoming: "Upcoming",
+    openTasks: "Open tasks: {{count}}",
+    taskPlan: "Contact Plan",
+    noTasks: "No tasks",
+    csvTitle: "Import Facebook CSV",
+    csvFiles: "CSV files from Facebook Leads",
+    csvHint: "You can choose multiple files at once. The system reads UTF-8 and Facebook UTF-16 TSV, creates new leads, and updates existing leads by phone or email.",
+    csvReady: "Done",
+    csvFileCount: "Files: {{count}}",
+    csvRows: "Rows read: {{count}}",
+    csvCreated: "Created: {{count}}",
+    csvUpdated: "Updated: {{count}}",
+    csvSkipped: "Skipped: {{count}}",
+    importing: "Importing...",
+    importAction: "Import"
+    ,
+    knowledgeBase: "Call Knowledge Base",
+    knowledgeBaseNote: "Scripts, terms, objection handling, and onboarding process. Edit it for your company.",
+    searchKnowledge: "Search scripts, terms, objections...",
+    allCategories: "All categories",
+    noKnowledgeFound: "No materials found",
+    adjustKnowledgeSearch: "Change the search or add the first knowledge base item.",
+    startCall: "Start Call",
+    noCallCandidates: "No candidates available for a call.",
+    howToUse: "How to use",
+    knowledgeTip: "Keep a live answer base here: rates, insurance, documents, objection handling, and follow-up wording. HR can quickly find an answer during the call and update materials after new cases.",
+    recommendedBlocks: "Recommended Script Blocks",
+    noRecommendations: "No recommendations for the current step.",
+    qualificationCall: "Qualification call",
+    step: "step",
+    callResultReady: "Result is ready to save.",
+    checkSummaryFinish: "Check the live summary and finish the call.",
+    saveContinue: "Save and continue",
+    finishSave: "Finish and save",
+    chooseAnswer: "Choose the candidate's answer",
+    liveNotes: "Live Call Notes",
+    liveNotesPlaceholder: "Free-form comments...",
+    choose: "Choose",
+    liveSummaryLocation: "Location",
+    callLanguageUpdated: "Call language updated"
+    ,
+    newKnowledge: "New knowledge base item",
+    editKnowledge: "Edit material",
+    title: "Title",
+    category: "Category",
+    order: "Order",
+    content: "Content",
+    knowledgeTitlePlaceholder: "Example: Insurance objection",
+    knowledgeContentPlaceholder: "Text HR can use during a call..."
+  }
+};
+
+const I18nContext = createContext({ lang: "ru", t: (key) => key });
+
+function translate(lang, key, params = {}) {
+  const template = interfaceCopy[lang]?.[key] || interfaceCopy.ru[key] || key;
+  return Object.entries(params).reduce((text, [param, value]) => text.replaceAll(`{{${param}}}`, String(value)), template);
+}
+
+function useI18n() {
+  return useContext(I18nContext);
+}
+
+function statusLabel(status, t) {
+  return t(`status_${status}`) || statusMap[status] || status;
+}
+
+function localizedStatuses(t) {
+  return statuses.map(([value]) => [value, statusLabel(value, t)]);
+}
 
 const knowledgeCategories = ["Opening", "Qualification", "Pay & Terms", "Insurance", "Documents", "Objections", "Process", "Custom"];
 
@@ -799,6 +1235,7 @@ export default function RecruitingHub() {
               companyName: settingsRow.company_name,
               hubName: settingsRow.hub_name,
               hrName: settingsRow.hr_name,
+              interfaceLanguage: settingsRow.offer_profile?.__interfaceLanguage || defaultSettings.interfaceLanguage,
               defaultScriptLanguage: settingsRow.default_script_language,
               offerProfile: mergeOfferProfile(settingsRow.offer_profile)
             }
@@ -1143,7 +1580,10 @@ export default function RecruitingHub() {
       hub_name: settings.hubName || defaultSettings.hubName,
       hr_name: settings.hrName || defaultSettings.hrName,
       default_script_language: settings.defaultScriptLanguage || "ru",
-      offer_profile: mergeOfferProfile(settings.offerProfile)
+      offer_profile: {
+        ...mergeOfferProfile(settings.offerProfile),
+        __interfaceLanguage: settings.interfaceLanguage || defaultSettings.interfaceLanguage
+      }
     };
     let { error } = await supabase.from("app_settings").upsert(settingsPayload);
     if (error?.code === "42703") {
@@ -1154,7 +1594,7 @@ export default function RecruitingHub() {
       notify(error.message);
       return;
     }
-    setDb((current) => ({ ...current, settings }));
+    setDb((current) => ({ ...current, settings: { ...settings, interfaceLanguage: settings.interfaceLanguage || defaultSettings.interfaceLanguage } }));
     notify("Настройки сохранены");
   }
 
@@ -1167,14 +1607,17 @@ export default function RecruitingHub() {
     () => db.candidates.find((candidate) => candidate.id === ui.selectedCandidateId),
     [db.candidates, ui.selectedCandidateId]
   );
+  const interfaceLanguage = db.settings.interfaceLanguage || defaultSettings.interfaceLanguage;
+  const t = (key, params) => translate(interfaceLanguage, key, params);
 
   if (!hasSupabaseEnv) return <SetupScreen />;
-  if (authLoading) return <ShellLoading label="Проверяем сессию..." />;
+  if (authLoading) return <ShellLoading label={t("checkingSession")} />;
   if (!session) return <AuthScreen />;
 
-  const title = titleForView(ui.view);
+  const title = titleForView(ui.view, t);
 
   return (
+    <I18nContext.Provider value={{ lang: interfaceLanguage, t }}>
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
@@ -1184,12 +1627,12 @@ export default function RecruitingHub() {
         </div>
         <nav className="nav">
           {[
-            ["dashboard", "⌂", "Dashboard"],
-            ["candidates", "◎", "Кандидаты"],
-            ["calls", "☎", "Скрипт звонка"],
-            ["pipeline", "▥", "Воронка"],
-            ["followups", "✓", "Follow-ups"],
-            ["settings", "⚙", "Настройки"]
+            ["dashboard", "⌂", t("dashboard")],
+            ["candidates", "◎", t("candidates")],
+            ["calls", "☎", t("calls")],
+            ["pipeline", "▥", t("pipeline")],
+            ["followups", "✓", t("followups")],
+            ["settings", "⚙", t("settings")]
           ].map(([view, icon, label]) => (
             <button
               key={view}
@@ -1202,8 +1645,8 @@ export default function RecruitingHub() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="local-chip"><span className="local-dot" /> Supabase connected</div>
-          <button className="btn btn-small sidebar-logout" onClick={() => supabase.auth.signOut()}>Выйти</button>
+          <div className="local-chip"><span className="local-dot" /> {t("connected")}</div>
+          <button className="btn btn-small sidebar-logout" onClick={() => supabase.auth.signOut()}>{t("logout")}</button>
         </div>
       </aside>
       <main className="main">
@@ -1213,12 +1656,12 @@ export default function RecruitingHub() {
             <div className="page-subtitle">{title[1]}</div>
           </div>
           <div className="top-actions">
-            <button className="btn desktop-only" onClick={() => setModal({ type: "followup" })}>＋ Follow-up</button>
-            <button className="btn btn-primary" onClick={() => setModal({ type: "candidate", candidate: blankCandidate() })}>＋ Новый кандидат</button>
+            <button className="btn desktop-only" onClick={() => setModal({ type: "followup" })}>＋ {t("addFollowup")}</button>
+            <button className="btn btn-primary" onClick={() => setModal({ type: "candidate", candidate: blankCandidate() })}>＋ {t("newCandidate")}</button>
           </div>
         </header>
         <section className="content">
-          {loading ? <ShellLoading label="Загружаем данные..." compact /> : null}
+          {loading ? <ShellLoading label={t("loadingData")} compact /> : null}
           {ui.view === "dashboard" && (
             <Dashboard
               db={db}
@@ -1367,18 +1810,19 @@ export default function RecruitingHub() {
       )}
       {toast ? <div className="toast">{toast}</div> : null}
     </div>
+    </I18nContext.Provider>
   );
 }
 
-function titleForView(view) {
-  if (view === "candidate") return ["Карточка кандидата", "Полный профиль, документы и путь онбординга"];
+function titleForView(view, t) {
+  if (view === "candidate") return [t("pageCandidateTitle"), t("pageCandidateSubtitle")];
   return {
-    dashboard: ["Dashboard", ""],
-    candidates: ["Кандидаты", "Единая база лидов и водителей"],
-    calls: ["Скрипт звонка", "База знаний и интерактивный помощник HR"],
-    pipeline: ["Воронка онбординга", "Перемещайте кандидатов между этапами"],
-    followups: ["Follow-ups", "План контактов и напоминаний"],
-    settings: ["Настройки", "Supabase, Vercel и параметры системы"]
+    dashboard: [t("dashboard"), t("pageDashboardSubtitle")],
+    candidates: [t("candidates"), t("pageCandidatesSubtitle")],
+    calls: [t("calls"), t("pageCallsSubtitle")],
+    pipeline: [t("pipeline"), t("pagePipelineSubtitle")],
+    followups: [t("followups"), t("pageFollowupsSubtitle")],
+    settings: [t("settings"), t("pageSettingsSubtitle")]
   }[view] || ["OwnerHub HRM", ""];
 }
 
@@ -1399,6 +1843,7 @@ function ShellLoading({ label, compact = false }) {
 }
 
 function AuthScreen() {
+  const { t } = useI18n();
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -1420,14 +1865,14 @@ function AuthScreen() {
   return (
     <div className="auth-page">
       <form className="auth-card" onSubmit={submit}>
-        <h1>OwnerHub HRM</h1>
-        <p>Войдите в Supabase аккаунт, чтобы открыть базу кандидатов.</p>
+        <h1>{t("loginTitle")}</h1>
+        <p>{t("loginSubtitle")}</p>
         <label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
-        <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={6} /></label>
+        <label>{t("password")}<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={6} /></label>
         {message ? <div className="auth-message">{message}</div> : null}
-        <button className="btn btn-primary" disabled={busy}>{busy ? "Подождите..." : mode === "login" ? "Войти" : "Создать аккаунт"}</button>
+        <button className="btn btn-primary" disabled={busy}>{busy ? t("wait") : mode === "login" ? t("login") : t("signup")}</button>
         <button type="button" className="link-btn" onClick={() => setMode(mode === "login" ? "signup" : "login")}>
-          {mode === "login" ? "Создать нового пользователя" : "Уже есть аккаунт"}
+          {mode === "login" ? t("createUser") : t("alreadyHaveAccount")}
         </button>
       </form>
     </div>
@@ -1435,6 +1880,7 @@ function AuthScreen() {
 }
 
 function Dashboard({ db, openCandidate, openFollowup, openStatus }) {
+  const { t } = useI18n();
   const total = db.candidates.length;
   const active = db.candidates.filter((candidate) => candidate.status === "active").length;
   const qualified = db.candidates.filter((candidate) => !["new", "contact_attempted", "lost"].includes(candidate.status)).length;
@@ -1454,15 +1900,15 @@ function Dashboard({ db, openCandidate, openFollowup, openStatus }) {
   return (
     <>
       <div className="grid stats-grid">
-        <StatCard label="Всего кандидатов" value={total} icon="◎" note="Полная база лидов" />
-        <StatCard label="В работе" value={qualified} icon="↗" note="Квалифицированы и проходят этапы" />
-        <StatCard label="Follow-ups сегодня" value={today} icon="✓" note="Требуют контакта сегодня" />
-        <StatCard label="Активные водители" value={active} icon="★" note="Успешно начали работу" />
+        <StatCard label={t("totalCandidates")} value={total} icon="◎" note={t("fullLeadBase")} />
+        <StatCard label={t("inProgress")} value={qualified} icon="↗" note={t("qualifiedAndStages")} />
+        <StatCard label={t("followupsToday")} value={today} icon="✓" note={t("requireContactToday")} />
+        <StatCard label={t("activeDrivers")} value={active} icon="★" note={t("startedWork")} />
       </div>
       <div className="card card-pad mt">
-        <SectionTitle title="Pipeline by status" note="Быстрый обзор всей базы по этапам" action={<button className="btn btn-small" onClick={() => openStatus("")}>Все лиды</button>} />
+        <SectionTitle title={t("pipelineByStatus")} note={t("pipelineByStatusNote")} action={<button className="btn btn-small" onClick={() => openStatus("")}>{t("allLeads")}</button>} />
         <div className="status-overview-grid">
-          {statuses.map(([status, label]) => {
+          {localizedStatuses(t).map(([status, label]) => {
             const count = statusCounts[status] || 0;
             const percent = total ? Math.round((count / total) * 100) : 0;
             return (
@@ -1470,7 +1916,7 @@ function Dashboard({ db, openCandidate, openFollowup, openStatus }) {
                 <span className={`status-dot ${badgeClass(status)}`} />
                 <span>{label}</span>
                 <strong>{count}</strong>
-                <small>{percent}% базы</small>
+                <small>{t("percentBase", { percent })}</small>
               </button>
             );
           })}
@@ -1478,21 +1924,21 @@ function Dashboard({ db, openCandidate, openFollowup, openStatus }) {
       </div>
       <div className="grid two-col mt">
         <div className="card card-pad">
-          <SectionTitle title="Последние кандидаты" note="Недавно добавленные и обновлённые лиды" />
-          {recent.length ? <CandidateMiniTable candidates={recent} openCandidate={openCandidate} /> : <Empty title="Кандидатов пока нет" note="Добавьте первый лид, чтобы начать работу." />}
+          <SectionTitle title={t("recentCandidates")} note={t("recentCandidatesNote")} />
+          {recent.length ? <CandidateMiniTable candidates={recent} openCandidate={openCandidate} /> : <Empty title={t("noCandidatesYet")} note={t("addFirstLead")} />}
         </div>
         <div className="card card-pad">
-          <SectionTitle title="Follow-ups" note="Ближайшие задачи HR" action={<button className="btn btn-small" onClick={openFollowup}>＋</button>} />
-          {openFollowups.length ? <div className="follow-list">{openFollowups.map((followup) => <FollowItem key={followup.id} followup={followup} candidate={db.candidates.find((candidate) => candidate.id === followup.candidateId)} />)}</div> : <Empty title="Нет открытых follow-ups" note="Все контакты обработаны." />}
+          <SectionTitle title={t("followups")} note={t("upcomingTasks")} action={<button className="btn btn-small" onClick={openFollowup}>＋</button>} />
+          {openFollowups.length ? <div className="follow-list">{openFollowups.map((followup) => <FollowItem key={followup.id} followup={followup} candidate={db.candidates.find((candidate) => candidate.id === followup.candidateId)} />)}</div> : <Empty title={t("noOpenFollowups")} note={t("contactsDone")} />}
         </div>
       </div>
       <div className="grid two-col mt">
         <div className="card card-pad">
-          <SectionTitle title="Кандидаты по штатам" note="География текущей базы" />
+          <SectionTitle title={t("candidatesByState")} note={t("currentGeography")} />
           <Bars items={topStates} />
         </div>
         <div className="card card-pad">
-          <SectionTitle title="Распределение по формату" note="Local, OTR и универсальные кандидаты" />
+          <SectionTitle title={t("workFormatDistribution")} note={t("workFormatNote")} />
           <Bars items={["Local", "OTR", "Both"].map((label) => [label, db.candidates.filter((candidate) => candidate.workPreference === label).length])} />
         </div>
       </div>
@@ -1515,10 +1961,11 @@ function Bars({ items }) {
 }
 
 function CandidateMiniTable({ candidates, openCandidate }) {
+  const { t } = useI18n();
   return (
     <div className="table-wrap">
       <table className="compact-table">
-        <thead><tr><th>Кандидат</th><th>Локация</th><th>Формат</th><th>Статус</th><th>Score</th></tr></thead>
+        <thead><tr><th>{t("candidate")}</th><th>{t("location")}</th><th>{t("format")}</th><th>{t("status")}</th><th>{t("score")}</th></tr></thead>
         <tbody>{candidates.map((candidate) => <tr key={candidate.id} onClick={() => openCandidate(candidate.id)}><td><Person candidate={candidate} /></td><td>{[candidate.city, candidate.state].filter(Boolean).join(", ") || "-"}</td><td>{candidate.workPreference || "-"}</td><td><StatusBadge status={candidate.status} /></td><td><Score value={candidate.score} /></td></tr>)}</tbody>
       </table>
     </div>
@@ -1526,6 +1973,7 @@ function CandidateMiniTable({ candidates, openCandidate }) {
 }
 
 function CandidatesView({ db, ui, setUi, openCandidate, editCandidate, startCall, addFollowup, importCsv, updateStatus }) {
+  const { t } = useI18n();
   const query = ui.filters.search.toLowerCase().trim();
   const stateCounts = {};
   db.candidates.forEach((candidate) => {
@@ -1546,19 +1994,19 @@ function CandidatesView({ db, ui, setUi, openCandidate, editCandidate, startCall
 
   return (
     <div className="card card-pad">
-      <SectionTitle title="База кандидатов" note={`Найдено: ${list.length} из ${db.candidates.length}`} />
+      <SectionTitle title={t("candidateBase")} note={t("foundCount", { shown: list.length, total: db.candidates.length })} />
       <div className="toolbar">
-        <div className="searchbox"><span>⌕</span><input placeholder="Имя, телефон, город, техника..." value={ui.filters.search} onChange={(event) => setFilter("search", event.target.value)} /></div>
-        <select value={ui.filters.state} onChange={(event) => setFilter("state", event.target.value)}><option value="">Все штаты</option>{stateOptions.map(([state, count]) => <option key={state} value={state}>{state} ({count})</option>)}</select>
+        <div className="searchbox"><span>⌕</span><input placeholder={t("searchCandidates")} value={ui.filters.search} onChange={(event) => setFilter("search", event.target.value)} /></div>
+        <select value={ui.filters.state} onChange={(event) => setFilter("state", event.target.value)}><option value="">{t("allStates")}</option>{stateOptions.map(([state, count]) => <option key={state} value={state}>{state} ({count})</option>)}</select>
         <select value={ui.filters.work} onChange={(event) => setFilter("work", event.target.value)}><option value="">Local / OTR</option>{["Local", "OTR", "Both", "Not sure"].map((work) => <option key={work}>{work}</option>)}</select>
-        <select value={ui.filters.status} onChange={(event) => setFilter("status", event.target.value)}><option value="">Все статусы</option>{statuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-        <button className="btn btn-small btn-primary" onClick={importCsv}>Import CSV</button>
-        <button className="btn btn-small" onClick={() => setUi((current) => ({ ...current, filters: { search: "", state: "", status: "", work: "" } }))}>Сбросить</button>
+        <select value={ui.filters.status} onChange={(event) => setFilter("status", event.target.value)}><option value="">{t("allStatuses")}</option>{localizedStatuses(t).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        <button className="btn btn-small btn-primary" onClick={importCsv}>{t("importCsv")}</button>
+        <button className="btn btn-small" onClick={() => setUi((current) => ({ ...current, filters: { search: "", state: "", status: "", work: "" } }))}>{t("reset")}</button>
       </div>
       {list.length ? (
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Кандидат</th><th>Локация</th><th>Работа</th><th>Техника</th><th>Статус</th><th>Следующий контакт</th><th>Score</th><th>Quick actions</th></tr></thead>
+            <thead><tr><th>{t("candidate")}</th><th>{t("location")}</th><th>{t("work")}</th><th>{t("equipment")}</th><th>{t("status")}</th><th>{t("nextContact")}</th><th>{t("score")}</th><th>{t("quickActions")}</th></tr></thead>
             <tbody>{list.map((candidate) => {
               const followup = db.followups.filter((item) => item.candidateId === candidate.id && item.status === "open").sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))[0];
               return (
@@ -1572,11 +2020,11 @@ function CandidatesView({ db, ui, setUi, openCandidate, editCandidate, startCall
                   <td><Score value={candidate.score} /></td>
                   <td>
                     <div className="quick-actions">
-                      <button className="btn btn-small" onClick={() => startCall(candidate.id)}>☎ Script</button>
+                      <button className="btn btn-small" onClick={() => startCall(candidate.id)}>☎ {t("script")}</button>
                       <button className="btn btn-small" onClick={() => addFollowup(candidate.id)}>＋ FU</button>
                       <button className="btn btn-small" onClick={() => editCandidate(candidate)}>✎</button>
                       <select value={candidate.status} onChange={(event) => updateStatus(candidate.id, event.target.value)} aria-label={`Change status for ${fullName(candidate)}`}>
-                        {statuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                        {localizedStatuses(t).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                       </select>
                     </div>
                   </td>
@@ -1585,12 +2033,13 @@ function CandidatesView({ db, ui, setUi, openCandidate, editCandidate, startCall
             })}</tbody>
           </table>
         </div>
-      ) : <Empty title="Ничего не найдено" note="Измените фильтры или добавьте нового кандидата." />}
+      ) : <Empty title={t("noResults")} note={t("changeFilters")} />}
     </div>
   );
 }
 
 function CandidateProfile({ candidate, activities, updateCandidate, editCandidate, addFollowup, deleteCandidate, startCall }) {
+  const { t } = useI18n();
   const progressIndex = Math.max(0, pipelineStatuses.indexOf(candidate.status));
   const progress = Math.min(100, Math.round((progressIndex / (pipelineStatuses.length - 2)) * 100));
 
@@ -1601,30 +2050,30 @@ function CandidateProfile({ candidate, activities, updateCandidate, editCandidat
           <div className="candidate-big-avatar">{initials(candidate)}</div>
           <div><div className="candidate-title">{fullName(candidate)}</div><div className="candidate-meta">{[candidate.city, candidate.state, candidate.zip].filter(Boolean).join(", ") || "Локация не указана"} · {candidate.workPreference || "Формат не выбран"} · Lead Score {candidate.score}</div></div>
           <div className="candidate-head-actions">
-            <button className="btn" onClick={() => startCall(candidate.id)}>☎ Скрипт звонка</button>
-            <button className="btn" onClick={() => editCandidate(candidate)}>✎ Редактировать</button>
-            <button className="btn btn-danger" onClick={() => window.confirm("Удалить кандидата?") && deleteCandidate(candidate.id)}>Удалить</button>
+            <button className="btn" onClick={() => startCall(candidate.id)}>☎ {t("callScript")}</button>
+            <button className="btn" onClick={() => editCandidate(candidate)}>✎ {t("edit")}</button>
+            <button className="btn btn-danger" onClick={() => window.confirm(t("deleteCandidate")) && deleteCandidate(candidate.id)}>{t("delete")}</button>
           </div>
         </div>
       </div>
       <div className="profile-grid">
         <div className="card">
-          <InfoSection title={<span>Контакт и предпочтения <StatusBadge status={candidate.status} /></span>} items={[["Телефон", candidate.phone], ["Email", candidate.email], ["Язык", candidate.language], ["Источник", candidate.source], ["Формат работы", candidate.workPreference], ["Home time", candidate.homeTime], ["Готов начать", fmtDate(candidate.startDate)], ["Дней в неделю", candidate.daysPerWeek], ["Ожидаемый gross", candidate.expectedGross]]} />
-          <InfoSection title="Водитель" items={[["CDL", candidate.cdl], ["License type", candidate.licenseType], ["Общий опыт", candidate.experienceYears ? `${candidate.experienceYears} years` : ""], ["Car hauling", candidate.carHaulingYears ? `${candidate.carHaulingYears} years` : ""], ["Two-car experience", candidate.twoCarExperience], ["Medical Card", candidate.medicalCard], ["Аварии", candidate.accidents], ["Нарушения", candidate.violations], ["Отказ страховой ранее", candidate.previousInsuranceRejection]]} />
+          <InfoSection title={<span>{t("contactPreferences")} <StatusBadge status={candidate.status} /></span>} items={[[t("phone"), candidate.phone], [t("email"), candidate.email], [t("language"), candidate.language], [t("source"), candidate.source], [t("format"), candidate.workPreference], [t("homeTime"), candidate.homeTime], [t("readyToStart"), fmtDate(candidate.startDate)], [t("daysPerWeek"), candidate.daysPerWeek], [t("expectedGross"), candidate.expectedGross]]} />
+          <InfoSection title={t("driver")} items={[["CDL", candidate.cdl], ["License type", candidate.licenseType], [t("experience"), candidate.experienceYears ? `${candidate.experienceYears} years` : ""], ["Car hauling", candidate.carHaulingYears ? `${candidate.carHaulingYears} years` : ""], ["Two-car experience", candidate.twoCarExperience], ["Medical Card", candidate.medicalCard], [t("accidents"), candidate.accidents], [t("violations"), candidate.violations], [t("insuranceRejection"), candidate.previousInsuranceRejection]]} />
           <InfoSection title="Truck" items={[["Марка / модель", [candidate.truck.make, candidate.truck.model].filter(Boolean).join(" ")], ["Год", candidate.truck.year], ["VIN", candidate.truck.vin], ["GVWR", candidate.truck.gvwr], ["Топливо", candidate.truck.fuel], ["Состояние", candidate.truck.condition], ["Инспекция", candidate.truck.inspection]]} />
           <InfoSection title="Trailer" items={[["Марка / модель", [candidate.trailer.make, candidate.trailer.model].filter(Boolean).join(" ")], ["Год", candidate.trailer.year], ["VIN", candidate.trailer.vin], ["Длина", candidate.trailer.length], ["GVWR", candidate.trailer.gvwr], ["Тип", candidate.trailer.type], ["Вместимость", `${candidate.trailer.capacity || "2"} cars`], ["Состояние", candidate.trailer.condition], ["Инспекция", candidate.trailer.inspection]]} />
-          <div className="info-section"><div className="info-title">Комментарии</div><div className="notes">{candidate.notes || "Комментариев пока нет."}</div>{candidate.restrictions ? <div className="script-help"><b>Ограничения:</b> {candidate.restrictions}</div> : null}</div>
+          <div className="info-section"><div className="info-title">{t("comments")}</div><div className="notes">{candidate.notes || t("noComments")}</div>{candidate.restrictions ? <div className="script-help"><b>{t("restrictions")}:</b> {candidate.restrictions}</div> : null}</div>
         </div>
         <div className="grid side-grid">
           <div className="card card-pad">
-            <div className="info-title">Прогресс онбординга</div>
-            <div className="progress-label"><span>{statusMap[candidate.status]}</span><strong>{progress}%</strong></div>
+            <div className="info-title">{t("onboardingProgress")}</div>
+            <div className="progress-label"><span>{statusLabel(candidate.status, t)}</span><strong>{progress}%</strong></div>
             <div className="progress"><div style={{ width: `${progress}%` }} /></div>
-            <label className="mt-label">Изменить этап<select value={candidate.status} onChange={(event) => updateCandidate({ ...candidate, status: event.target.value, updatedAt: new Date().toISOString() }, `Статус изменён на ${statusMap[event.target.value]}`, "status")}>{statuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-            <button className="btn btn-primary full" onClick={() => addFollowup(candidate.id)}>＋ Добавить follow-up</button>
+            <label className="mt-label">{t("changeStage")}<select value={candidate.status} onChange={(event) => updateCandidate({ ...candidate, status: event.target.value, updatedAt: new Date().toISOString() }, `Статус изменён на ${statusLabel(event.target.value, t)}`, "status")}>{localizedStatuses(t).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <button className="btn btn-primary full" onClick={() => addFollowup(candidate.id)}>＋ {t("addFollowup")}</button>
           </div>
           <div className="card card-pad">
-            <div className="info-title">Документы</div>
+            <div className="info-title">{t("documents")}</div>
             <div className="docs-grid">{Object.entries(docLabels).map(([key, label]) => <div className="doc-row" key={key}><strong>{label}</strong><select value={candidate.docs[key] || "not_requested"} onChange={(event) => updateCandidate({ ...candidate, docs: { ...candidate.docs, [key]: event.target.value } }, `${label}: ${event.target.value}`, "document")}>{docStatuses.map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></div>)}</div>
           </div>
           <div className="card card-pad">
@@ -1633,8 +2082,8 @@ function CandidateProfile({ candidate, activities, updateCandidate, editCandidat
             <label className="mt-label">Weekly quote<input value={candidate.insurance.weeklyQuote} onChange={(event) => updateCandidate({ ...candidate, insurance: { ...candidate.insurance, weeklyQuote: event.target.value } }, "Insurance quote обновлён", "insurance")} placeholder="$300-$400" /></label>
           </div>
           <div className="card card-pad">
-            <div className="info-title">История активности</div>
-            {activities.length ? <div className="timeline">{activities.map((activity) => <div className="timeline-item" key={activity.id}><span className="timeline-dot" /><strong>{activity.text}</strong><time>{fmtDate(activity.createdAt, true)}</time></div>)}</div> : <div className="section-note">История пока пуста.</div>}
+            <div className="info-title">{t("activityHistory")}</div>
+            {activities.length ? <div className="timeline">{activities.map((activity) => <div className="timeline-item" key={activity.id}><span className="timeline-dot" /><strong>{activity.text}</strong><time>{fmtDate(activity.createdAt, true)}</time></div>)}</div> : <div className="section-note">{t("emptyHistory")}</div>}
           </div>
         </div>
       </div>
@@ -1647,6 +2096,7 @@ function InfoSection({ title, items }) {
 }
 
 function OfferBuilder({ offer, onSave }) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState(mergeOfferProfile(offer));
   const update = (key, value) => setDraft((current) => ({ ...current, [key]: value }));
 
@@ -1673,7 +2123,7 @@ function OfferBuilder({ offer, onSave }) {
 
   return (
     <div className="card card-pad offer-builder">
-      <SectionTitle title="Offer Builder" note="Единый источник правды для скрипта. Рекомендации во время звонка строятся из этих условий." action={<button className="btn btn-small btn-primary" onClick={() => onSave(draft)}>Сохранить offer</button>} />
+      <SectionTitle title="Offer Builder" note={t("knowledgeBaseNote")} action={<button className="btn btn-small btn-primary" onClick={() => onSave(draft)}>{t("save")}</button>} />
       <div className="offer-grid">
         {rows.map(([key, label]) => (
           <label key={key}>{label}<textarea value={draft[key] || ""} onChange={(event) => update(key, event.target.value)} /></label>
@@ -1684,6 +2134,7 @@ function OfferBuilder({ offer, onSave }) {
 }
 
 function KnowledgeBaseView({ knowledge, candidates, offer, updateOfferProfile, startCall, openNewCandidate, openEditor, deleteItem }) {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const cleanQuery = query.trim().toLowerCase();
@@ -1699,14 +2150,14 @@ function KnowledgeBaseView({ knowledge, candidates, offer, updateOfferProfile, s
     <div className="knowledge-layout">
       <div className="card card-pad knowledge-main">
         <SectionTitle
-          title="База знаний для звонков"
-          note="Скрипты, условия, ответы на возражения и процесс онбординга. Можно редактировать под компанию."
-          action={<button className="btn btn-primary" onClick={() => openEditor()}>＋ Материал</button>}
+          title={t("knowledgeBase")}
+          note={t("knowledgeBaseNote")}
+          action={<button className="btn btn-primary" onClick={() => openEditor()}>＋ {t("add")}</button>}
         />
         <div className="toolbar">
-          <div className="searchbox"><span>⌕</span><input placeholder="Поиск по скриптам, terms, objections..." value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+          <div className="searchbox"><span>⌕</span><input placeholder={t("searchKnowledge")} value={query} onChange={(event) => setQuery(event.target.value)} /></div>
           <select value={category} onChange={(event) => setCategory(event.target.value)}>
-            <option value="">Все категории</option>
+            <option value="">{t("allCategories")}</option>
             {knowledgeCategories.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
         </div>
@@ -1718,7 +2169,7 @@ function KnowledgeBaseView({ knowledge, candidates, offer, updateOfferProfile, s
                   <span className="badge badge-yellow">{item.category}</span>
                   <div className="knowledge-card-actions">
                     <button className="btn btn-small" onClick={() => openEditor(item)}>✎</button>
-                    <button className="btn btn-small btn-danger" onClick={() => window.confirm("Удалить материал?") && deleteItem(item.id)}>×</button>
+                    <button className="btn btn-small btn-danger" onClick={() => window.confirm(t("deleteCandidate")) && deleteItem(item.id)}>×</button>
                   </div>
                 </div>
                 <h3>{item.title}</h3>
@@ -1728,14 +2179,14 @@ function KnowledgeBaseView({ knowledge, candidates, offer, updateOfferProfile, s
             ))}
           </div>
         ) : (
-          <Empty title="Материалов не найдено" note="Измените поиск или добавьте первый материал базы знаний." />
+          <Empty title={t("noKnowledgeFound")} note={t("adjustKnowledgeSearch")} />
         )}
       </div>
 
       <aside className="grid side-grid">
         <OfferBuilder offer={offer} onSave={updateOfferProfile} />
         <div className="card card-pad">
-          <SectionTitle title="Начать звонок" action={<button className="btn btn-small btn-primary" onClick={openNewCandidate}>＋ Lead</button>} />
+          <SectionTitle title={t("startCall")} action={<button className="btn btn-small btn-primary" onClick={openNewCandidate}>＋ Lead</button>} />
           {candidates.length ? (
             <div className="call-start-list">
               {candidates.slice(0, 8).map((candidate) => (
@@ -1746,12 +2197,12 @@ function KnowledgeBaseView({ knowledge, candidates, offer, updateOfferProfile, s
               ))}
             </div>
           ) : (
-            <div className="section-note padded">Нет кандидатов для звонка.</div>
+            <div className="section-note padded">{t("noCallCandidates")}</div>
           )}
         </div>
         <div className="card card-pad">
-          <div className="info-title">Как использовать</div>
-          <div className="knowledge-tip">Держите здесь живую базу ответов: rates, insurance, документы, objection handling, follow-up wording. HR может быстро найти ответ во время звонка и обновить материал после новых кейсов.</div>
+          <div className="info-title">{t("howToUse")}</div>
+          <div className="knowledge-tip">{t("knowledgeTip")}</div>
         </div>
       </aside>
     </div>
@@ -1834,9 +2285,10 @@ function getScriptRecommendations(candidate, step, knowledge, offerInput) {
 }
 
 function ScriptRecommendations({ items }) {
+  const { t } = useI18n();
   return (
     <div className="card card-pad recommendation-card">
-      <div className="info-title">Recommended script blocks</div>
+      <div className="info-title">{t("recommendedBlocks")}</div>
       {items.length ? (
         <div className="recommendation-list">
           {items.map((item) => (
@@ -1847,12 +2299,13 @@ function ScriptRecommendations({ items }) {
             </div>
           ))}
         </div>
-      ) : <div className="section-note">Нет рекомендаций для текущего шага.</div>}
+      ) : <div className="section-note">{t("noRecommendations")}</div>}
     </div>
   );
 }
 
 function CallsView({ db, ui, setUi, saveCandidate, createFollowup, notify, openNewCandidate, openKnowledgeEditor, deleteKnowledgeItem, updateOfferProfile }) {
+  const { t } = useI18n();
   const candidate = db.candidates.find((item) => item.id === ui.callCandidateId);
   const available = db.candidates.filter((item) => item.status !== "active" && item.status !== "lost");
 
@@ -1949,23 +2402,23 @@ function CallsView({ db, ui, setUi, saveCandidate, createFollowup, notify, openN
     <div className="call-layout">
       <div className="card call-card">
         <div className="call-top">
-          <div className="call-progress-label-wrap"><div className="call-progress-label">Квалификационный звонок · {historyLen + 1} шаг</div><div className="progress"><div style={{ width: `${pct}%` }} /></div></div>
-          <select value={lang} onChange={(event) => persist({ ...candidate, call: { ...candidate.call, language: event.target.value } }, "Язык звонка обновлён")}><option value="ru">Русский</option><option value="en">English</option></select>
+          <div className="call-progress-label-wrap"><div className="call-progress-label">{t("qualificationCall")} · {historyLen + 1} {t("step")}</div><div className="progress"><div style={{ width: `${pct}%` }} /></div></div>
+          <select value={lang} onChange={(event) => persist({ ...candidate, call: { ...candidate.call, language: event.target.value } }, t("callLanguageUpdated"))}><option value="ru">{t("russian")}</option><option value="en">English</option></select>
           <button className="btn icon-btn" onClick={() => setUi((current) => ({ ...current, callCandidateId: null }))}>×</button>
         </div>
         <div className="call-body">
           <span className="script-label">● HR говорит</span>
           <div className="script-text">{(step.say?.[lang] || step.say?.ru || "").replace("[HR NAME]", db.settings.hrName).replace("[COMPANY]", db.settings.companyName)}</div>
           {step.help ? <div className="script-help">{step.help}</div> : null}
-          {step.finish ? <div className="script-help success"><strong>Результат готов к сохранению.</strong><br />Проверьте live summary и завершите звонок.</div> : step.type === "options" ? <div className="answer-options">{step.options.map((option) => <button className="btn answer-btn" key={option.v} onClick={() => advanceOption(step.key, option.v, option.next)}>{option[lang] || option.ru}</button>)}</div> : <form onSubmit={advanceFields} className="call-fields"><CallFieldsGrid candidate={candidate} fields={step.fields} /><div className="call-footer"><BackButton candidate={candidate} persist={persist} /><button className="btn btn-primary">Сохранить и продолжить →</button></div></form>}
-          {step.type !== "fields" ? <div className="call-footer"><BackButton candidate={candidate} persist={persist} />{step.finish ? <button className="btn btn-primary" onClick={completeCall}>Завершить и сохранить</button> : <span className="section-note">Выберите ответ кандидата</span>}</div> : null}
+          {step.finish ? <div className="script-help success"><strong>{t("callResultReady")}</strong><br />{t("checkSummaryFinish")}</div> : step.type === "options" ? <div className="answer-options">{step.options.map((option) => <button className="btn answer-btn" key={option.v} onClick={() => advanceOption(step.key, option.v, option.next)}>{option[lang] || option.ru}</button>)}</div> : <form onSubmit={advanceFields} className="call-fields"><CallFieldsGrid candidate={candidate} fields={step.fields} /><div className="call-footer"><BackButton candidate={candidate} persist={persist} /><button className="btn btn-primary">{t("saveContinue")} →</button></div></form>}
+          {step.type !== "fields" ? <div className="call-footer"><BackButton candidate={candidate} persist={persist} />{step.finish ? <button className="btn btn-primary" onClick={completeCall}>{t("finishSave")}</button> : <span className="section-note">{t("chooseAnswer")}</span>}</div> : null}
         </div>
       </div>
       <div className="grid live-summary">
-        <div className="card card-pad"><div className="info-title">Кандидат</div><Person candidate={candidate} /><div className="mt-small"><StatusBadge status={candidate.status} /></div></div>
+        <div className="card card-pad"><div className="info-title">{t("candidate")}</div><Person candidate={candidate} /><div className="mt-small"><StatusBadge status={candidate.status} /></div></div>
         <ScriptRecommendations items={scriptRecommendations} />
         <div className="card card-pad"><div className="info-title">Live summary</div><LiveSummary candidate={candidate} /></div>
-        <div className="card card-pad"><div className="info-title">Заметки во время звонка</div><textarea value={candidate.call.answers.liveNotes || ""} onChange={(event) => persist({ ...candidate, call: { ...candidate.call, answers: { ...candidate.call.answers, liveNotes: event.target.value } } }, "Live notes обновлены")} placeholder="Свободные комментарии..." /></div>
+        <div className="card card-pad"><div className="info-title">{t("liveNotes")}</div><textarea value={candidate.call.answers.liveNotes || ""} onChange={(event) => persist({ ...candidate, call: { ...candidate.call, answers: { ...candidate.call.answers, liveNotes: event.target.value } } }, "Live notes updated")} placeholder={t("liveNotesPlaceholder")} /></div>
       </div>
     </div>
   );
@@ -1997,41 +2450,44 @@ function CallFieldsGrid({ candidate, fields }) {
 }
 
 function CallField({ candidate, field }) {
+  const { t } = useI18n();
   const [key, type, label] = field;
   const existing = getPath(candidate, key) || candidate.call.answers[key] || "";
   if (type === "textarea") return <label className="field-span">{label}<textarea name={key} defaultValue={existing} /></label>;
-  if (type === "state") return <label>{label}<select name={key} defaultValue={existing}><option value="">Выберите</option>{states.map((state) => <option key={state}>{state}</option>)}</select></label>;
+  if (type === "state") return <label>{label}<select name={key} defaultValue={existing}><option value="">{t("choose")}</option>{states.map((state) => <option key={state}>{state}</option>)}</select></label>;
   if (type.startsWith("select:")) {
     const options = type.split(":")[1].split("|");
-    return <label>{label}<select name={key} defaultValue={existing}><option value="">Выберите</option>{options.map((option) => <option key={option}>{option}</option>)}</select></label>;
+    return <label>{label}<select name={key} defaultValue={existing}><option value="">{t("choose")}</option>{options.map((option) => <option key={option}>{option}</option>)}</select></label>;
   }
   return <label>{label}<input name={key} type={type} defaultValue={existing} /></label>;
 }
 
 function LiveSummary({ candidate }) {
+  const { t } = useI18n();
   const rows = [
-    ["Локация", [candidate.city, candidate.state, candidate.zip].filter(Boolean).join(", ")],
-    ["Формат", candidate.workPreference],
+    [t("location"), [candidate.city, candidate.state, candidate.zip].filter(Boolean).join(", ")],
+    [t("format"), candidate.workPreference],
     ["Home time", candidate.homeTime],
     ["Truck", [candidate.truck.make, candidate.truck.model, candidate.truck.year].filter(Boolean).join(" ")],
     ["Trailer", [candidate.trailer.make, candidate.trailer.model, candidate.trailer.year].filter(Boolean).join(" ")],
-    ["Опыт", candidate.carHaulingYears ? `${candidate.carHaulingYears} years car hauling` : ""],
+    [t("experience"), candidate.carHaulingYears ? `${candidate.carHaulingYears} years car hauling` : ""],
     ["CDL", candidate.cdl],
-    ["Дата старта", fmtDate(candidate.startDate)],
+    [t("startDate"), fmtDate(candidate.startDate)],
     ["Score", candidate.score]
   ];
   return <div className="summary-list">{rows.map(([label, value]) => <div className="summary-row" key={label}><span>{label}</span><strong>{valueOrDash(value)}</strong></div>)}</div>;
 }
 
 function PipelineView({ candidates, ui, setUi, openCandidate, updateStatus }) {
+  const { t } = useI18n();
   const query = ui.pipelineSearch.toLowerCase();
   return (
     <>
-      <div className="toolbar"><div className="searchbox"><span>⌕</span><input placeholder="Поиск в воронке..." value={ui.pipelineSearch} onChange={(event) => setUi((current) => ({ ...current, pipelineSearch: event.target.value }))} /></div></div>
+      <div className="toolbar"><div className="searchbox"><span>⌕</span><input placeholder={t("searchCandidates")} value={ui.pipelineSearch} onChange={(event) => setUi((current) => ({ ...current, pipelineSearch: event.target.value }))} /></div></div>
       <div className="kanban">
         {pipelineStatuses.map((status) => {
           const list = candidates.filter((candidate) => candidate.status === status && (!query || [fullName(candidate), candidate.city, candidate.state, candidate.phone].join(" ").toLowerCase().includes(query)));
-          return <div className="kanban-col" key={status} onDragOver={(event) => event.preventDefault()} onDrop={(event) => updateStatus(event.dataTransfer.getData("text/plain"), status)}><div className="kanban-head"><strong>{statusMap[status]}</strong><span className="kanban-count">{list.length}</span></div><div className="kanban-cards">{list.map((candidate) => <div className="kanban-card" draggable key={candidate.id} onDragStart={(event) => event.dataTransfer.setData("text/plain", candidate.id)} onClick={() => openCandidate(candidate.id)}><div className="name">{fullName(candidate)}</div><div className="meta">{[candidate.city, candidate.state].filter(Boolean).join(", ") || "Локация не указана"}</div><div className="meta">{candidate.workPreference || "Формат не выбран"}</div><div className="foot"><span className="badge badge-yellow">{candidate.truck.make || "No truck"}</span><Score value={candidate.score} small /></div></div>)}</div></div>;
+          return <div className="kanban-col" key={status} onDragOver={(event) => event.preventDefault()} onDrop={(event) => updateStatus(event.dataTransfer.getData("text/plain"), status)}><div className="kanban-head"><strong>{statusLabel(status, t)}</strong><span className="kanban-count">{list.length}</span></div><div className="kanban-cards">{list.map((candidate) => <div className="kanban-card" draggable key={candidate.id} onDragStart={(event) => event.dataTransfer.setData("text/plain", candidate.id)} onClick={() => openCandidate(candidate.id)}><div className="name">{fullName(candidate)}</div><div className="meta">{[candidate.city, candidate.state].filter(Boolean).join(", ") || t("location")}</div><div className="meta">{candidate.workPreference || t("format")}</div><div className="foot"><span className="badge badge-yellow">{candidate.truck.make || "No truck"}</span><Score value={candidate.score} small /></div></div>)}</div></div>;
         })}
       </div>
     </>
@@ -2039,28 +2495,31 @@ function PipelineView({ candidates, ui, setUi, openCandidate, updateStatus }) {
 }
 
 function FollowupsView({ db, ui, setUi, openCandidate, completeFollowup, snoozeFollowup, addFollowup }) {
+  const { t } = useI18n();
   const all = db.followups.filter((followup) => ui.followFilter === "all" || followup.status === ui.followFilter).sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
   const overdue = all.filter((followup) => followup.status === "open" && followup.date < todayISO());
   const today = all.filter((followup) => followup.status === "open" && followup.date === todayISO());
   const upcoming = all.filter((followup) => followup.status !== "open" || followup.date > todayISO());
   return (
     <>
-      <SectionTitle title="План контактов" note={`Открытых задач: ${db.followups.filter((followup) => followup.status === "open").length}`} action={<button className="btn btn-primary" onClick={addFollowup}>＋ Новый follow-up</button>} />
+      <SectionTitle title={t("taskPlan")} note={t("openTasks", { count: db.followups.filter((followup) => followup.status === "open").length })} action={<button className="btn btn-primary" onClick={addFollowup}>＋ {t("newFollowup")}</button>} />
       <div className="toolbar">{["open", "done", "all"].map((filter) => <button key={filter} className={`btn btn-small ${ui.followFilter === filter ? "btn-primary" : ""}`} onClick={() => setUi((current) => ({ ...current, followFilter: filter }))}>{filter}</button>)}</div>
       <div className="grid three-col">
-        <FollowColumn title="Просрочено" list={overdue} db={db} openCandidate={openCandidate} completeFollowup={completeFollowup} snoozeFollowup={snoozeFollowup} badge="badge-red" />
-        <FollowColumn title="Сегодня" list={today} db={db} openCandidate={openCandidate} completeFollowup={completeFollowup} snoozeFollowup={snoozeFollowup} badge="badge-yellow" />
-        <FollowColumn title="Предстоящие" list={upcoming} db={db} openCandidate={openCandidate} completeFollowup={completeFollowup} snoozeFollowup={snoozeFollowup} badge="badge-blue" />
+        <FollowColumn title={t("overdue")} list={overdue} db={db} openCandidate={openCandidate} completeFollowup={completeFollowup} snoozeFollowup={snoozeFollowup} badge="badge-red" />
+        <FollowColumn title={t("today")} list={today} db={db} openCandidate={openCandidate} completeFollowup={completeFollowup} snoozeFollowup={snoozeFollowup} badge="badge-yellow" />
+        <FollowColumn title={t("upcoming")} list={upcoming} db={db} openCandidate={openCandidate} completeFollowup={completeFollowup} snoozeFollowup={snoozeFollowup} badge="badge-blue" />
       </div>
     </>
   );
 }
 
 function FollowColumn({ title, list, db, openCandidate, completeFollowup, snoozeFollowup, badge }) {
-  return <div className="card card-pad"><SectionTitle title={title} action={<span className={`badge ${badge}`}>{list.length}</span>} />{list.length ? <div className="follow-list">{list.map((followup) => <FollowItem key={followup.id} followup={followup} candidate={db.candidates.find((candidate) => candidate.id === followup.candidateId)} openCandidate={openCandidate} completeFollowup={completeFollowup} snoozeFollowup={snoozeFollowup} />)}</div> : <div className="section-note padded">Нет задач</div>}</div>;
+  const { t } = useI18n();
+  return <div className="card card-pad"><SectionTitle title={title} action={<span className={`badge ${badge}`}>{list.length}</span>} />{list.length ? <div className="follow-list">{list.map((followup) => <FollowItem key={followup.id} followup={followup} candidate={db.candidates.find((candidate) => candidate.id === followup.candidateId)} openCandidate={openCandidate} completeFollowup={completeFollowup} snoozeFollowup={snoozeFollowup} />)}</div> : <div className="section-note padded">{t("noTasks")}</div>}</div>;
 }
 
 function SettingsView({ db, workspace, updateSettings, reload }) {
+  const { t } = useI18n();
   const [settings, setSettings] = useState(db.settings);
   const [tokens, setTokens] = useState([]);
   const [generatedToken, setGeneratedToken] = useState("");
@@ -2069,6 +2528,10 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
   const webhookUrl = typeof window === "undefined" ? "/api/make/leads" : `${window.location.origin}/api/make/leads`;
   const currentToken = tokens.find((token) => token.active) || tokens[0] || null;
   const visibleToken = currentToken?.token_value || generatedToken || "";
+
+  useEffect(() => {
+    setSettings(db.settings);
+  }, [db.settings]);
 
   useEffect(() => {
     if (!workspace?.id) return;
@@ -2158,39 +2621,40 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
   return (
     <>
       <div className="card card-pad settings">
-        <SectionTitle title="Настройки" />
-        <div className="settings-row"><div className="settings-copy"><strong>Компания</strong><p>Используется в скрипте звонка.</p></div><input value={settings.companyName} onChange={(event) => setSettings({ ...settings, companyName: event.target.value })} /></div>
-        <div className="settings-row"><div className="settings-copy"><strong>HR name</strong><p>Подставляется в начало звонка.</p></div><input value={settings.hrName} onChange={(event) => setSettings({ ...settings, hrName: event.target.value })} /></div>
-        <div className="settings-row"><div className="settings-copy"><strong>Синхронизация</strong><p>Перезагрузить данные.</p></div><button className="btn" onClick={reload}>Обновить данные</button></div>
-        <div className="settings-row"><div className="settings-copy"><strong>Сохранить</strong><p>Записать настройки.</p></div><button className="btn btn-primary" onClick={() => updateSettings(settings)}>Сохранить</button></div>
+        <SectionTitle title={t("settingsTitle")} />
+        <div className="settings-row"><div className="settings-copy"><strong>{t("company")}</strong><p>{t("companyNote")}</p></div><input value={settings.companyName} onChange={(event) => setSettings({ ...settings, companyName: event.target.value })} /></div>
+        <div className="settings-row"><div className="settings-copy"><strong>{t("hrName")}</strong><p>{t("hrNameNote")}</p></div><input value={settings.hrName} onChange={(event) => setSettings({ ...settings, hrName: event.target.value })} /></div>
+        <div className="settings-row"><div className="settings-copy"><strong>{t("interfaceLanguage")}</strong><p>{t("interfaceLanguageNote")}</p></div><select value={settings.interfaceLanguage || "ru"} onChange={(event) => setSettings({ ...settings, interfaceLanguage: event.target.value })}><option value="ru">{t("russian")}</option><option value="en">{t("english")}</option></select></div>
+        <div className="settings-row"><div className="settings-copy"><strong>{t("sync")}</strong><p>{t("syncNote")}</p></div><button className="btn" onClick={reload}>{t("refreshData")}</button></div>
+        <div className="settings-row"><div className="settings-copy"><strong>{t("save")}</strong><p>{t("saveNote")}</p></div><button className="btn btn-primary" onClick={() => updateSettings(settings)}>{t("save")}</button></div>
       </div>
 
       <div className="card card-pad settings mt">
-        <SectionTitle title="Make Integration" action={<button className="btn btn-small" onClick={() => setShowGuide(true)}>Инструкция</button>} />
+        <SectionTitle title="Make Integration" action={<button className="btn btn-small" onClick={() => setShowGuide(true)}>{t("instruction")}</button>} />
         <div className="settings-row">
-          <div className="settings-copy"><strong>Webhook URL</strong><p>Этот URL вставляется в HTTP module в Make.</p></div>
+          <div className="settings-copy"><strong>Webhook URL</strong><p>{t("webhookUrlNote")}</p></div>
           <input readOnly value={webhookUrl} onFocus={(event) => event.target.select()} />
         </div>
         <div className="settings-row">
-          <div className="settings-copy"><strong>Personal token</strong><p>При генерации нового токена старые токены удаляются. В Make должен использоваться только текущий token.</p></div>
-          <button className="btn btn-primary" disabled={busy || !workspace?.id} onClick={generateToken}>{busy ? "Создаём..." : "Generate new token"}</button>
+          <div className="settings-copy"><strong>{t("personalToken")}</strong><p>{t("personalTokenNote")}</p></div>
+          <button className="btn btn-primary" disabled={busy || !workspace?.id} onClick={generateToken}>{busy ? t("creating") : t("generateToken")}</button>
         </div>
         <div className="settings-row">
-          <div className="settings-copy"><strong>Current token</strong><p>Этот token можно копировать в любое время. Хранится только внутри текущего workspace.</p></div>
+          <div className="settings-copy"><strong>{t("currentToken")}</strong><p>{t("currentTokenNote")}</p></div>
           <div className="token-copy-box">
-            <textarea readOnly value={visibleToken || "Token ещё не создан"} onFocus={(event) => event.target.select()} />
-            <button className="btn btn-small" disabled={!visibleToken} onClick={() => copyToken(visibleToken)}>Copy token</button>
+            <textarea readOnly value={visibleToken || t("tokenMissing")} onFocus={(event) => event.target.select()} />
+            <button className="btn btn-small" disabled={!visibleToken} onClick={() => copyToken(visibleToken)}>{t("copyToken")}</button>
           </div>
         </div>
         <div className="settings-row">
-          <div className="settings-copy"><strong>Token status</strong><p>В системе должен быть только один активный token. Новый token автоматически заменяет старый.</p></div>
+          <div className="settings-copy"><strong>{t("tokenStatus")}</strong><p>{t("tokenStatusNote")}</p></div>
           <div className="token-list">
             {tokens.length ? tokens.map((token) => (
               <div className="token-row" key={token.id}>
                 <div><strong>{token.name}</strong><span>{token.token_preview} · {token.active ? "active" : "inactive"}</span></div>
-                <button className="btn btn-small btn-danger" onClick={() => revokeToken(token.id)}>Delete</button>
+                <button className="btn btn-small btn-danger" onClick={() => revokeToken(token.id)}>{t("delete")}</button>
               </div>
-            )) : <div className="section-note">Токены ещё не созданы.</div>}
+            )) : <div className="section-note">{t("noTokens")}</div>}
           </div>
         </div>
       </div>
@@ -2201,7 +2665,82 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
 }
 
 function MakeGuideModal({ webhookUrl, token, onClose }) {
+  const { lang, t } = useI18n();
   const displayToken = token || "TOKEN_FROM_OWNERHUB_SETTINGS";
+
+  if (lang === "en") {
+    return (
+      <div className="modal-backdrop">
+        <div className="modal wide">
+          <div className="modal-head"><strong>Make lead setup</strong><button className="btn icon-btn" onClick={onClose}>×</button></div>
+          <div className="modal-body guide">
+            <div className="guide-step guide-intro">
+              <b>What we are building</b>
+              <p>The final Make scenario should look like this. For each Facebook Lead Form, it is better to create a separate scenario.</p>
+              <pre>{`Facebook Lead Ads - New Lead
+→ Facebook Lead Ads - Get Lead Details
+→ HTTP - Make a request`}</pre>
+            </div>
+            <div className="guide-step">
+              <b>1. Prepare access</b>
+              <p>The Facebook Page must have an Instant Form, and your Facebook account must have lead access for that Page. Instagram leads come through the connected Facebook Page.</p>
+            </div>
+            <div className="guide-step">
+              <b>2. First module: New Lead</b>
+              <p>Create a Make scenario and add Facebook Lead Ads → New Lead. Connect Facebook, choose the Page, and choose the exact Form. If the Page is not selectable, use the numeric Page ID, not the page name.</p>
+              <pre>{`Module: Facebook Lead Ads - New Lead
+Webhook name: OwnerHub - Form Name
+Page: choose from dropdown or use numeric Page ID
+Form: choose one exact lead form`}</pre>
+            </div>
+            <div className="guide-step">
+              <b>3. Second module: Get Lead Details</b>
+              <p>Add Facebook Lead Ads → Get Lead Details. In Lead ID, choose Lead ID from the first New Lead module. Do not choose Full Name, Phone Number, or Email there.</p>
+              <pre>{`Module: Facebook Lead Ads - Get Lead Details
+Page: same Page
+Form: same Form
+Lead ID: Lead ID from module 1 - New Lead`}</pre>
+            </div>
+            <div className="guide-step">
+              <b>4. Third module: HTTP</b>
+              <p>Add HTTP → Make a request. Authentication type must be No authentication. Security is handled by the x-ownerhub-token header.</p>
+              <pre>{`Authentication type: No authentication
+URL: ${webhookUrl}
+Method: POST
+Headers:
+  Content-Type: application/json
+  x-ownerhub-token: ${displayToken}
+Body content type: application/json
+Body input method: JSON string
+Parse response: Yes`}</pre>
+            </div>
+            <div className="guide-step">
+              <b>5. Body content</b>
+              <p>Paste the JSON below. In field_data, choose Field data from the Get Lead Details module. Do not type field_data manually and do not wrap the mapped token in quotes.</p>
+              <pre>{`{
+  "source": "Facebook Lead Form",
+  "field_data": {{Field data}},
+  "notes": "Imported from Make"
+}`}</pre>
+            </div>
+            <div className="guide-step">
+              <b>6. Smart mapping</b>
+              <p>Forms can be different. The webhook reads field_data and maps full_name, phone_number, email, city, state, CDL, truck_make, trailer_make, Russian labels, and similar variants. Unrecognized answers are saved into candidate comments.</p>
+            </div>
+            <div className="guide-step">
+              <b>7. Multiple forms</b>
+              <p>Create a separate Make scenario for each Facebook Lead Form. Use the same URL and token when all leads should go into this workspace. Put the form name into source so OwnerHub shows where the lead came from.</p>
+            </div>
+            <div className="guide-step">
+              <b>8. Test</b>
+              <p>Click Run once in Make, create a test lead in Meta Lead Ads Testing Tool, and check the HTTP response. A successful response returns ok: true. Then the candidate appears in Candidates.</p>
+            </div>
+          </div>
+          <div className="modal-foot"><button className="btn btn-primary" onClick={onClose}>{t("done")}</button></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-backdrop">
@@ -2399,6 +2938,7 @@ function LocationFields({ draft, setDraft }) {
 }
 
 function CsvImportModal({ onClose, onImport }) {
+  const { t } = useI18n();
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
@@ -2421,11 +2961,11 @@ function CsvImportModal({ onClose, onImport }) {
   return (
     <div className="modal-backdrop">
       <div className="modal">
-        <div className="modal-head"><strong>Import Facebook CSV</strong><button className="btn icon-btn" onClick={onClose}>×</button></div>
+        <div className="modal-head"><strong>{t("csvTitle")}</strong><button className="btn icon-btn" onClick={onClose}>×</button></div>
         <div className="modal-body">
           <div className="import-panel">
             <label className="field-span">
-              CSV файлы из Facebook Leads
+              {t("csvFiles")}
               <input
                 type="file"
                 accept=".csv,text/csv,.tsv,text/tab-separated-values"
@@ -2435,7 +2975,7 @@ function CsvImportModal({ onClose, onImport }) {
               />
             </label>
             <div className="section-note">
-              Можно выбрать несколько файлов сразу. Система читает UTF-8 и Facebook UTF-16 TSV, создаёт новых лидов и обновляет существующих по телефону или email.
+              {t("csvHint")}
             </div>
             {files.length ? (
               <div className="import-file-list">
@@ -2444,12 +2984,12 @@ function CsvImportModal({ onClose, onImport }) {
             ) : null}
             {result ? (
               <div className="import-result">
-                <strong>Готово</strong>
-                <span>Файлов: {result.files}</span>
-                <span>Строк прочитано: {result.parsed}</span>
-                <span>Создано: {result.created}</span>
-                <span>Обновлено: {result.updated}</span>
-                <span>Пропущено: {result.skipped}</span>
+                <strong>{t("csvReady")}</strong>
+                <span>{t("csvFileCount", { count: result.files })}</span>
+                <span>{t("csvRows", { count: result.parsed })}</span>
+                <span>{t("csvCreated", { count: result.created })}</span>
+                <span>{t("csvUpdated", { count: result.updated })}</span>
+                <span>{t("csvSkipped", { count: result.skipped })}</span>
               </div>
             ) : null}
             {error ? <div className="field-hint error">{error}</div> : null}
@@ -2457,11 +2997,11 @@ function CsvImportModal({ onClose, onImport }) {
         </div>
         <div className="modal-foot">
           {result ? (
-            <button className="btn btn-primary" onClick={onClose}>Готово</button>
+            <button className="btn btn-primary" onClick={onClose}>{t("done")}</button>
           ) : (
             <>
-              <button className="btn" onClick={onClose}>Закрыть</button>
-              <button className="btn btn-primary" disabled={!files.length || busy} onClick={runImport}>{busy ? "Импортируем..." : "Импортировать"}</button>
+              <button className="btn" onClick={onClose}>{t("close")}</button>
+              <button className="btn btn-primary" disabled={!files.length || busy} onClick={runImport}>{busy ? t("importing") : t("importAction")}</button>
             </>
           )}
         </div>
@@ -2471,6 +3011,7 @@ function CsvImportModal({ onClose, onImport }) {
 }
 
 function CandidateModal({ candidate, onClose, onSave }) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState(structuredClone(candidate));
   const update = (key, value) => setDraft((current) => ({ ...current, [key]: value }));
   const updateNested = (group, key, value) => setDraft((current) => ({ ...current, [group]: { ...current[group], [key]: value } }));
@@ -2478,20 +3019,20 @@ function CandidateModal({ candidate, onClose, onSave }) {
   return (
     <div className="modal-backdrop">
       <div className="modal wide">
-        <div className="modal-head"><strong>{candidate.firstName || candidate.lastName ? "Редактировать кандидата" : "Новый кандидат"}</strong><button className="btn icon-btn" onClick={onClose}>×</button></div>
+        <div className="modal-head"><strong>{candidate.firstName || candidate.lastName ? t("editCandidateModal") : t("newCandidateModal")}</strong><button className="btn icon-btn" onClick={onClose}>×</button></div>
         <div className="modal-body">
           <div className="field-grid-3">
-            <label>Имя<input value={draft.firstName} onChange={(event) => update("firstName", event.target.value)} /></label>
-            <label>Фамилия<input value={draft.lastName} onChange={(event) => update("lastName", event.target.value)} /></label>
-            <label>Язык<select value={draft.language} onChange={(event) => update("language", event.target.value)}>{["Russian", "Ukrainian", "English"].map((value) => <option key={value}>{value}</option>)}</select></label>
-            <label>Телефон<input value={draft.phone} onChange={(event) => update("phone", event.target.value)} /></label>
+            <label>{t("firstName")}<input value={draft.firstName} onChange={(event) => update("firstName", event.target.value)} /></label>
+            <label>{t("lastName")}<input value={draft.lastName} onChange={(event) => update("lastName", event.target.value)} /></label>
+            <label>{t("language")}<select value={draft.language} onChange={(event) => update("language", event.target.value)}>{["Russian", "Ukrainian", "English"].map((value) => <option key={value}>{value}</option>)}</select></label>
+            <label>{t("phone")}<input value={draft.phone} onChange={(event) => update("phone", event.target.value)} /></label>
             <label>Email<input value={draft.email} onChange={(event) => update("email", event.target.value)} /></label>
-            <label>Источник<input value={draft.source} onChange={(event) => update("source", event.target.value)} /></label>
+            <label>{t("source")}<input value={draft.source} onChange={(event) => update("source", event.target.value)} /></label>
             <LocationFields draft={draft} setDraft={setDraft} />
-            <label>Формат<select value={draft.workPreference} onChange={(event) => update("workPreference", event.target.value)}><option value="">Не выбран</option>{["Local", "OTR", "Both", "Not sure"].map((value) => <option key={value}>{value}</option>)}</select></label>
-            <label>Home time<input value={draft.homeTime} onChange={(event) => update("homeTime", event.target.value)} /></label>
-            <label>Дата старта<input type="date" value={draft.startDate} onChange={(event) => update("startDate", event.target.value)} /></label>
-            <label>CDL<select value={draft.cdl} onChange={(event) => update("cdl", event.target.value)}><option value="">Не указан</option><option>Yes</option><option>No</option></select></label>
+            <label>{t("format")}<select value={draft.workPreference} onChange={(event) => update("workPreference", event.target.value)}><option value="">{t("notSelected")}</option>{["Local", "OTR", "Both", "Not sure"].map((value) => <option key={value}>{value}</option>)}</select></label>
+            <label>{t("homeTime")}<input value={draft.homeTime} onChange={(event) => update("homeTime", event.target.value)} /></label>
+            <label>{t("startDate")}<input type="date" value={draft.startDate} onChange={(event) => update("startDate", event.target.value)} /></label>
+            <label>CDL<select value={draft.cdl} onChange={(event) => update("cdl", event.target.value)}><option value="">{t("notSpecified")}</option><option>Yes</option><option>No</option></select></label>
             <label>Experience years<input type="number" value={draft.experienceYears} onChange={(event) => update("experienceYears", event.target.value)} /></label>
             <label>Car hauling years<input type="number" value={draft.carHaulingYears} onChange={(event) => update("carHaulingYears", event.target.value)} /></label>
             <label>Truck make<input value={draft.truck.make} onChange={(event) => updateNested("truck", "make", event.target.value)} /></label>
@@ -2500,16 +3041,17 @@ function CandidateModal({ candidate, onClose, onSave }) {
             <label>Trailer make<input value={draft.trailer.make} onChange={(event) => updateNested("trailer", "make", event.target.value)} /></label>
             <label>Trailer model<input value={draft.trailer.model} onChange={(event) => updateNested("trailer", "model", event.target.value)} /></label>
             <label>Trailer year<input type="number" value={draft.trailer.year} onChange={(event) => updateNested("trailer", "year", event.target.value)} /></label>
-            <label className="field-span">Комментарий<textarea value={draft.notes} onChange={(event) => update("notes", event.target.value)} /></label>
+            <label className="field-span">{t("note")}<textarea value={draft.notes} onChange={(event) => update("notes", event.target.value)} /></label>
           </div>
         </div>
-        <div className="modal-foot"><button className="btn" onClick={onClose}>Отмена</button><button className="btn btn-primary" onClick={() => onSave({ ...draft, score: calculateScore(draft), updatedAt: new Date().toISOString() })}>Сохранить</button></div>
+        <div className="modal-foot"><button className="btn" onClick={onClose}>{t("cancel")}</button><button className="btn btn-primary" onClick={() => onSave({ ...draft, score: calculateScore(draft), updatedAt: new Date().toISOString() })}>{t("save")}</button></div>
       </div>
     </div>
   );
 }
 
 function FollowupModal({ candidates, defaultCandidateId, onClose, onSave }) {
+  const { t } = useI18n();
   const [candidateId, setCandidateId] = useState(defaultCandidateId);
   const [date, setDate] = useState(todayISO());
   const [time, setTime] = useState("10:00");
@@ -2518,23 +3060,24 @@ function FollowupModal({ candidates, defaultCandidateId, onClose, onSave }) {
   return (
     <div className="modal-backdrop">
       <div className="modal">
-        <div className="modal-head"><strong>Новый follow-up</strong><button className="btn icon-btn" onClick={onClose}>×</button></div>
+        <div className="modal-head"><strong>{t("newFollowup")}</strong><button className="btn icon-btn" onClick={onClose}>×</button></div>
         <div className="modal-body">
           <div className="field-grid">
-            <label className="field-span">Кандидат<select value={candidateId} onChange={(event) => setCandidateId(event.target.value)}><option value="">Выберите кандидата</option>{candidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{fullName(candidate)} · {[candidate.city, candidate.state].filter(Boolean).join(", ")}</option>)}</select></label>
-            <label>Дата<input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
-            <label>Время<input type="time" value={time} onChange={(event) => setTime(event.target.value)} /></label>
-            <label>Тип<select value={type} onChange={(event) => setType(event.target.value)}>{["Call", "WhatsApp", "SMS", "Email"].map((value) => <option key={value}>{value}</option>)}</select></label>
-            <label className="field-span">Комментарий<textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Что нужно сделать или уточнить" /></label>
+            <label className="field-span">{t("candidate")}<select value={candidateId} onChange={(event) => setCandidateId(event.target.value)}><option value="">{t("chooseCandidate")}</option>{candidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{fullName(candidate)} · {[candidate.city, candidate.state].filter(Boolean).join(", ")}</option>)}</select></label>
+            <label>{t("date")}<input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
+            <label>{t("time")}<input type="time" value={time} onChange={(event) => setTime(event.target.value)} /></label>
+            <label>{t("type")}<select value={type} onChange={(event) => setType(event.target.value)}>{["Call", "WhatsApp", "SMS", "Email"].map((value) => <option key={value}>{value}</option>)}</select></label>
+            <label className="field-span">{t("note")}<textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("whatToDo")} /></label>
           </div>
         </div>
-        <div className="modal-foot"><button className="btn" onClick={onClose}>Отмена</button><button className="btn btn-primary" onClick={() => candidateId && onSave({ candidateId, date, time, type, note })}>Добавить</button></div>
+        <div className="modal-foot"><button className="btn" onClick={onClose}>{t("cancel")}</button><button className="btn btn-primary" onClick={() => candidateId && onSave({ candidateId, date, time, type, note })}>{t("add")}</button></div>
       </div>
     </div>
   );
 }
 
 function KnowledgeModal({ item, onClose, onSave }) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState({
     ...item,
     tagsText: (item.tags || []).join(", ")
@@ -2544,22 +3087,22 @@ function KnowledgeModal({ item, onClose, onSave }) {
   return (
     <div className="modal-backdrop">
       <div className="modal wide">
-        <div className="modal-head"><strong>{item.title ? "Редактировать материал" : "Новый материал базы знаний"}</strong><button className="btn icon-btn" onClick={onClose}>×</button></div>
+        <div className="modal-head"><strong>{item.title ? t("editKnowledge") : t("newKnowledge")}</strong><button className="btn icon-btn" onClick={onClose}>×</button></div>
         <div className="modal-body">
           <div className="field-grid">
-            <label>Название<input value={draft.title} onChange={(event) => update("title", event.target.value)} placeholder="Например: Возражение по insurance" /></label>
-            <label>Категория<select value={draft.category} onChange={(event) => update("category", event.target.value)}>{knowledgeCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
-            <label>Порядок<input type="number" value={draft.sortOrder} onChange={(event) => update("sortOrder", event.target.value)} /></label>
+            <label>{t("title")}<input value={draft.title} onChange={(event) => update("title", event.target.value)} placeholder={t("knowledgeTitlePlaceholder")} /></label>
+            <label>{t("category")}<select value={draft.category} onChange={(event) => update("category", event.target.value)}>{knowledgeCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
+            <label>{t("order")}<input type="number" value={draft.sortOrder} onChange={(event) => update("sortOrder", event.target.value)} /></label>
             <label>Tags<input value={draft.tagsText} onChange={(event) => update("tagsText", event.target.value)} placeholder="insurance, objection, docs" /></label>
-            <label className="field-span">Содержание<textarea className="knowledge-textarea" value={draft.content} onChange={(event) => update("content", event.target.value)} placeholder="Текст, который HR может использовать во время звонка..." /></label>
+            <label className="field-span">{t("content")}<textarea className="knowledge-textarea" value={draft.content} onChange={(event) => update("content", event.target.value)} placeholder={t("knowledgeContentPlaceholder")} /></label>
           </div>
         </div>
         <div className="modal-foot">
-          <button className="btn" onClick={onClose}>Отмена</button>
+          <button className="btn" onClick={onClose}>{t("cancel")}</button>
           <button className="btn btn-primary" onClick={() => onSave({
             ...draft,
             tags: draft.tagsText.split(",").map((tag) => tag.trim()).filter(Boolean)
-          })}>Сохранить</button>
+          })}>{t("save")}</button>
         </div>
       </div>
     </div>
@@ -2567,11 +3110,13 @@ function KnowledgeModal({ item, onClose, onSave }) {
 }
 
 function Person({ candidate }) {
-  return <div className="person"><div className="avatar">{initials(candidate)}</div><div><strong>{fullName(candidate)}</strong><small>{candidate.phone || candidate.email || "Нет контакта"}</small></div></div>;
+  const { t } = useI18n();
+  return <div className="person"><div className="avatar">{initials(candidate)}</div><div><strong>{fullName(candidate)}</strong><small>{candidate.phone || candidate.email || t("noContact")}</small></div></div>;
 }
 
 function StatusBadge({ status }) {
-  return <span className={`badge ${badgeClass(status)}`}>{statusMap[status] || status}</span>;
+  const { t } = useI18n();
+  return <span className={`badge ${badgeClass(status)}`}>{statusLabel(status, t)}</span>;
 }
 
 function Score({ value, small = false }) {
@@ -2583,10 +3128,11 @@ function Empty({ title, note }) {
 }
 
 function FollowItem({ followup, candidate, openCandidate, completeFollowup, snoozeFollowup }) {
+  const { t } = useI18n();
   return (
     <div className="follow-item">
       <div className="follow-time">{followup.time || "-"}<div>{fmtDate(followup.date).split(" ").slice(0, 2).join(" ")}</div></div>
-      <div className="follow-main" onClick={() => candidate && openCandidate?.(candidate.id)}><strong>{candidate ? fullName(candidate) : "Кандидат удалён"}</strong><span>{followup.type} · {followup.note || "Без комментария"}</span></div>
+      <div className="follow-main" onClick={() => candidate && openCandidate?.(candidate.id)}><strong>{candidate ? fullName(candidate) : t("deletedCandidate")}</strong><span>{followup.type} · {followup.note || t("noComment")}</span></div>
       {followup.status === "open" && completeFollowup ? <div className="follow-actions"><button className="btn btn-small" onClick={() => completeFollowup(followup.id)}>✓</button><button className="btn btn-small" onClick={() => snoozeFollowup(followup.id)}>+1</button></div> : followup.status === "done" ? <span className="badge badge-green">Done</span> : null}
     </div>
   );
