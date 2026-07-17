@@ -1219,7 +1219,19 @@ export default function RecruitingHub() {
         </header>
         <section className="content">
           {loading ? <ShellLoading label="Загружаем данные..." compact /> : null}
-          {ui.view === "dashboard" && <Dashboard db={db} openCandidate={(id) => setUi((current) => ({ ...current, view: "candidate", selectedCandidateId: id }))} openFollowup={() => setModal({ type: "followup" })} />}
+          {ui.view === "dashboard" && (
+            <Dashboard
+              db={db}
+              openCandidate={(id) => setUi((current) => ({ ...current, view: "candidate", selectedCandidateId: id }))}
+              openFollowup={() => setModal({ type: "followup" })}
+              openStatus={(status) => setUi((current) => ({
+                ...current,
+                view: "candidates",
+                selectedCandidateId: null,
+                filters: { search: "", state: "", work: "", status }
+              }))}
+            />
+          )}
           {ui.view === "candidates" && (
             <CandidatesView
               db={db}
@@ -1422,13 +1434,17 @@ function AuthScreen() {
   );
 }
 
-function Dashboard({ db, openCandidate, openFollowup }) {
+function Dashboard({ db, openCandidate, openFollowup, openStatus }) {
   const total = db.candidates.length;
   const active = db.candidates.filter((candidate) => candidate.status === "active").length;
   const qualified = db.candidates.filter((candidate) => !["new", "contact_attempted", "lost"].includes(candidate.status)).length;
   const today = db.followups.filter((followup) => followup.status === "open" && followup.date === todayISO()).length;
   const openFollowups = [...db.followups].filter((followup) => followup.status === "open").sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)).slice(0, 6);
   const recent = [...db.candidates].sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))).slice(0, 6);
+  const statusCounts = Object.fromEntries(statuses.map(([status]) => [status, 0]));
+  db.candidates.forEach((candidate) => {
+    statusCounts[candidate.status] = (statusCounts[candidate.status] || 0) + 1;
+  });
   const stateCounts = {};
   db.candidates.forEach((candidate) => {
     if (candidate.state) stateCounts[candidate.state] = (stateCounts[candidate.state] || 0) + 1;
@@ -1442,6 +1458,23 @@ function Dashboard({ db, openCandidate, openFollowup }) {
         <StatCard label="В работе" value={qualified} icon="↗" note="Квалифицированы и проходят этапы" />
         <StatCard label="Follow-ups сегодня" value={today} icon="✓" note="Требуют контакта сегодня" />
         <StatCard label="Активные водители" value={active} icon="★" note="Успешно начали работу" />
+      </div>
+      <div className="card card-pad mt">
+        <SectionTitle title="Pipeline by status" note="Быстрый обзор всей базы по этапам" action={<button className="btn btn-small" onClick={() => openStatus("")}>Все лиды</button>} />
+        <div className="status-overview-grid">
+          {statuses.map(([status, label]) => {
+            const count = statusCounts[status] || 0;
+            const percent = total ? Math.round((count / total) * 100) : 0;
+            return (
+              <button className="status-overview-card" key={status} onClick={() => openStatus(status)}>
+                <span className={`status-dot ${badgeClass(status)}`} />
+                <span>{label}</span>
+                <strong>{count}</strong>
+                <small>{percent}% базы</small>
+              </button>
+            );
+          })}
+        </div>
       </div>
       <div className="grid two-col mt">
         <div className="card card-pad">

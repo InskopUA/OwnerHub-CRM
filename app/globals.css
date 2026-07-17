@@ -71,6 +71,13 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .stat-value { font-size: 34px; line-height: 1; font-weight: 950; letter-spacing: -.04em; margin-top: 16px; }
 .stat-note { font-size: 11px; color: var(--muted); margin-top: 10px; }
 .stat-accent { position: absolute; top: 18px; right: 18px; z-index: 1; width: 34px; height: 34px; border-radius: 11px; background: var(--yellow); display: grid; place-items: center; font-weight: 900; }
+.status-overview-grid { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 9px; }
+.status-overview-card { appearance: none; border: 1px solid var(--line); background: white; border-radius: 12px; padding: 11px; min-height: 78px; display: grid; grid-template-columns: 10px 1fr; grid-template-rows: auto auto auto; column-gap: 8px; row-gap: 2px; text-align: left; align-items: center; transition: .16s ease; }
+.status-overview-card:hover { border-color: #f1d338; background: #fffdf2; transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.status-dot { grid-row: 1 / 4; width: 10px; height: 42px; border-radius: 999px; align-self: stretch; }
+.status-overview-card span:not(.status-dot) { min-width: 0; color: #3d4045; font-size: 11px; font-weight: 900; line-height: 1.2; }
+.status-overview-card strong { font-size: 22px; line-height: 1; letter-spacing: -.03em; }
+.status-overview-card small { color: var(--muted); font-size: 10px; white-space: nowrap; }
 
 .section-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 .section-title { font-size: 18px; font-weight: 900; letter-spacing: -.02em; }
@@ -281,6 +288,7 @@ small { color: var(--muted); }
 
 @media (max-width: 1120px) {
   .stats-grid, .three-col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .status-overview-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .two-col, .profile-grid, .call-layout, .knowledge-layout { grid-template-columns: 1fr; }
   .live-summary { position: static; }
   .candidate-choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -293,6 +301,7 @@ small { color: var(--muted); }
   .top-actions { flex-wrap: wrap; justify-content: flex-end; }
   .content { padding: 18px 16px 34px; }
   .stats-grid, .three-col, .field-grid, .field-grid-3, .info-grid, .candidate-choice-grid, .knowledge-grid { grid-template-columns: 1fr; }
+  .status-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .field-span { grid-column: auto; }
   .candidate-head-inner { align-items: flex-start; flex-wrap: wrap; }
   .candidate-head-actions { margin-left: 0; width: 100%; }
