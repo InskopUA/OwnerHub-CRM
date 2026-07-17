@@ -7,6 +7,7 @@ import {
   docLabels,
   docStatuses,
   pipelineStatuses,
+  normalizeCandidateStatus,
   states,
   statusMap,
   statuses
@@ -320,7 +321,7 @@ function mapCandidate(row, equipment, docs, insurance, callState) {
       weeklyQuote: candidateInsurance?.weekly_quote || "",
       notes: candidateInsurance?.notes || ""
     },
-    status: row.status || "new",
+    status: normalizeCandidateStatus(row.status || "new"),
     score: row.score ?? 50,
     owner: row.owner_name || "HR Manager",
     notes: row.notes || "",
@@ -393,11 +394,12 @@ function blankKnowledgeItem() {
 }
 
 function badgeClass(status) {
-  if (["active", "insurance_approved", "ready_first_load"].includes(status)) return "badge-green";
-  if (["lost", "insurance_rejected"].includes(status)) return "badge-red";
-  if (["quote_pending", "docs_requested"].includes(status)) return "badge-orange";
-  if (["qualified", "docs_received"].includes(status)) return "badge-blue";
-  if (["safety_onboarding", "dispatch_onboarding"].includes(status)) return "badge-purple";
+  const normalizedStatus = normalizeCandidateStatus(status);
+  if (normalizedStatus === "active") return "badge-green";
+  if (normalizedStatus === "lost") return "badge-red";
+  if (["quote_pending", "docs_requested"].includes(normalizedStatus)) return "badge-orange";
+  if (normalizedStatus === "qualified") return "badge-blue";
+  if (normalizedStatus === "safety_onboarding") return "badge-purple";
   return "badge-gray";
 }
 
@@ -1423,7 +1425,7 @@ function AuthScreen() {
 function Dashboard({ db, openCandidate, openFollowup }) {
   const total = db.candidates.length;
   const active = db.candidates.filter((candidate) => candidate.status === "active").length;
-  const qualified = db.candidates.filter((candidate) => !["new", "contact_attempted", "initial_contact", "lost"].includes(candidate.status)).length;
+  const qualified = db.candidates.filter((candidate) => !["new", "contact_attempted", "lost"].includes(candidate.status)).length;
   const today = db.followups.filter((followup) => followup.status === "open" && followup.date === todayISO()).length;
   const openFollowups = [...db.followups].filter((followup) => followup.status === "open").sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)).slice(0, 6);
   const recent = [...db.candidates].sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))).slice(0, 6);
@@ -1890,7 +1892,7 @@ function CallsView({ db, ui, setUi, saveCandidate, createFollowup, notify, openN
     }
     if (outcome === "lost") nextCandidate.status = "lost";
     if (outcome === "followup" || outcome === "message") nextCandidate.status = "contact_attempted";
-    if (outcome === "thinking" || outcome === "nurture") nextCandidate.status = "initial_contact";
+    if (outcome === "thinking" || outcome === "nurture") nextCandidate.status = "contact_attempted";
     if (nextCandidate.call.answers.liveNotes) nextCandidate.notes = [nextCandidate.notes, nextCandidate.call.answers.liveNotes].filter(Boolean).join("\n\n");
     nextCandidate.score = calculateScore(nextCandidate);
     try {

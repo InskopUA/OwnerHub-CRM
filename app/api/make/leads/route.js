@@ -193,25 +193,30 @@ const hashToken = (token) => createHash("sha256").update(token).digest("hex");
 const validStatuses = new Set([
   "new",
   "contact_attempted",
-  "initial_contact",
   "qualified",
   "docs_requested",
-  "docs_received",
   "quote_pending",
-  "insurance_approved",
-  "insurance_rejected",
-  "offer_presented",
   "agreement_sent",
-  "agreement_signed",
-  "equipment_shipped",
-  "inspection_pending",
   "safety_onboarding",
-  "dispatch_onboarding",
-  "ready_first_load",
-  "first_load",
   "active",
   "lost"
 ]);
+
+const legacyStatusGroups = {
+  initial_contact: "contact_attempted",
+  docs_received: "docs_requested",
+  insurance_approved: "quote_pending",
+  insurance_rejected: "quote_pending",
+  offer_presented: "agreement_sent",
+  agreement_signed: "agreement_sent",
+  equipment_shipped: "safety_onboarding",
+  inspection_pending: "safety_onboarding",
+  dispatch_onboarding: "safety_onboarding",
+  ready_first_load: "safety_onboarding",
+  first_load: "active"
+};
+
+const normalizeStatus = (status) => legacyStatusGroups[status] || status;
 
 async function resolveWorkspace(body, request, token) {
   const expectedSecret = process.env.OWNERHUB_MAKE_WEBHOOK_SECRET;
@@ -282,7 +287,7 @@ function mapLead(body, workspaceId) {
     extraFields.length ? `Additional lead fields:\n${extraFields.join("\n")}` : ""
   ].filter(Boolean).join("\n\n");
   const source = pick(body, ["source", "leadSource", "lead_source", "utm_source"], "Make");
-  const status = pick(body, ["status"], "new");
+  const status = normalizeStatus(pick(body, ["status"], "new"));
 
   return {
     workspace_id: workspaceId,
