@@ -196,6 +196,11 @@ const interfaceCopy = {
     quoSmsFromNote: "Укажите Quo phone number ID вида PN... Его можно получить через Quo API phone-numbers или в настройках номера.",
     welcomeSmsTemplate: "Текст welcome SMS",
     welcomeSmsTemplateNote: "Можно использовать {{firstName}}, {{lastName}}, {{fullName}}, {{companyName}}, {{hrName}}.",
+    welcomeSmsSetupGuide: "Как настроить Welcome SMS",
+    welcomeSmsGuideApiKey: "В Quo откройте API key и вставьте его в поле Quo API key.",
+    welcomeSmsGuideSender: "В Quo docs откройте Phone Numbers → List phone numbers, нажмите Send и скопируйте id нужного номера. ID начинается с PN.",
+    welcomeSmsGuideSave: "Вставьте PN... в Quo sender, включите Send welcome SMS to new leads и нажмите Save.",
+    welcomeSmsGuideTest: "Для теста создайте новый лид через Make. SMS отправляется только новым лидам, не обновлениям существующих.",
     close: "Закрыть",
     done: "Готово",
     cancel: "Отмена",
@@ -469,6 +474,11 @@ const interfaceCopy = {
     quoSmsFromNote: "Enter the Quo phone number ID in PN... format. You can get it from Quo API phone-numbers or number settings.",
     welcomeSmsTemplate: "Welcome SMS text",
     welcomeSmsTemplateNote: "You can use {{firstName}}, {{lastName}}, {{fullName}}, {{companyName}}, {{hrName}}.",
+    welcomeSmsSetupGuide: "How to set up Welcome SMS",
+    welcomeSmsGuideApiKey: "In Quo, open API key and paste it into Quo API key.",
+    welcomeSmsGuideSender: "In Quo docs, open Phone Numbers → List phone numbers, click Send, and copy the id for the sending number. The id starts with PN.",
+    welcomeSmsGuideSave: "Paste PN... into Quo sender, enable Send welcome SMS to new leads, and click Save.",
+    welcomeSmsGuideTest: "To test, create a new lead through Make. SMS is sent only to new leads, not existing lead updates.",
     close: "Close",
     done: "Done",
     cancel: "Cancel",
@@ -3628,6 +3638,14 @@ function SettingsView({ db, workspace, updateSettings, reload }) {
         <div className="settings-row">
           <div className="settings-copy"><strong>{t("welcomeSmsTemplate")}</strong><p>{t("welcomeSmsTemplateNote")}</p></div>
           <textarea value={settings.welcomeSmsTemplate || ""} onChange={(event) => setSettings({ ...settings, welcomeSmsTemplate: event.target.value })} />
+        </div>
+        <div className="settings-row">
+          <div className="settings-copy"><strong>{t("welcomeSmsSetupGuide")}</strong><p>{t("welcomeSmsGuideTest")}</p></div>
+          <div className="mini-guide">
+            <div><span>1</span><p>{t("welcomeSmsGuideApiKey")}</p></div>
+            <div><span>2</span><p>{t("welcomeSmsGuideSender")}</p></div>
+            <div><span>3</span><p>{t("welcomeSmsGuideSave")}</p></div>
+          </div>
         </div>
       </div>
 

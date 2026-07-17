@@ -323,6 +323,10 @@ small { color: var(--muted); }
 .token-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: white; }
 .token-row strong { display: block; font-size: 12px; }
 .token-row span { display: block; color: var(--muted); font-size: 11px; margin-top: 3px; }
+.mini-guide { display: grid; gap: 9px; }
+.mini-guide div { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fbfbfa; }
+.mini-guide span { width: 28px; height: 28px; border-radius: 10px; background: var(--yellow); display: grid; place-items: center; color: var(--ink); font-size: 12px; font-weight: 950; }
+.mini-guide p { margin: 0; color: #4f5155; font-size: 12px; line-height: 1.45; font-weight: 750; }
 .guide { display: grid; gap: 15px; }
 .guide-step { border: 1px solid var(--line); border-radius: 14px; padding: 14px; background: #fbfbfa; }
 .guide-step b { display: block; margin-bottom: 6px; }
