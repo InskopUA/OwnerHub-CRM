@@ -2919,6 +2919,7 @@ function buildAnalytics(db, period, selectedDate) {
   });
 
   db.activities.forEach((activity) => {
+    if (!isProductiveActivity(activity)) return;
     const day = touchLead(activity.createdAt, activity.candidateId, activity.createdAt);
     if (day && activity.type === "status") day.statusChanges += 1;
   });
@@ -3015,6 +3016,16 @@ function createAnalyticsDay(date) {
     touchedCandidateIds: new Set(),
     events: []
   };
+}
+
+function isProductiveActivity(activity) {
+  const type = String(activity.type || "").toLowerCase();
+  const text = String(activity.text || "").toLowerCase();
+  if (!activity.candidateId) return false;
+  if (["create", "lead"].includes(type)) return false;
+  if (text.includes("csv import") || text.includes("imported from facebook csv")) return false;
+  if (text.includes("auto follow-up created")) return false;
+  return ["edit", "status", "call", "note", "document", "insurance"].includes(type);
 }
 
 function callDurationSeconds(call) {
