@@ -13,6 +13,23 @@ import {
 } from "../lib/recruitingData";
 
 const DOCUMENTS_BUCKET = "candidate-documents";
+const MB = 1024 * 1024;
+const DOCUMENT_STORAGE_MAX_BYTES = 15 * MB;
+const PDF_UPLOAD_MAX_BYTES = 10 * MB;
+const IMAGE_UPLOAD_MAX_BYTES = 8 * MB;
+const IMAGE_COMPRESS_TRIGGER_BYTES = 2 * MB;
+const IMAGE_MAX_DIMENSION = 2200;
+const IMAGE_COMPRESSION_STEPS = [0.82, 0.72];
+const ALLOWED_DOCUMENT_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"];
+const ALLOWED_DOCUMENT_MIME_TYPES = new Set([
+  "application/pdf",
+  "application/octet-stream",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif"
+]);
 
 const defaultSettings = {
   companyName: "Sofia Logistics LLC",
@@ -1110,6 +1127,100 @@ const safeStorageFileName = (name) => {
   return cleaned || "document";
 };
 
+const fileExtension = (fileName) => {
+  const lower = String(fileName || "").toLowerCase();
+  const dotIndex = lower.lastIndexOf(".");
+  return dotIndex >= 0 ? lower.slice(dotIndex) : "";
+};
+
+const formatFileSize = (bytes) => `${(Number(bytes || 0) / MB).toFixed(1)} MB`;
+
+function isAllowedDocumentFile(file) {
+  const extension = fileExtension(file?.name);
+  const mimeType = file?.type || "";
+  return (mimeType && ALLOWED_DOCUMENT_MIME_TYPES.has(mimeType))
+    || ALLOWED_DOCUMENT_EXTENSIONS.includes(extension);
+}
+
+function isPdfDocument(file) {
+  return file?.type === "application/pdf" || fileExtension(file?.name) === ".pdf";
+}
+
+function isImageDocument(file) {
+  return String(file?.type || "").startsWith("image/") || [".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"].includes(fileExtension(file?.name));
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error("Не удалось сжать изображение"));
+    }, type, quality);
+  });
+}
+
+async function compressImageDocument(file) {
+  if (!isImageDocument(file) || file.size <= IMAGE_COMPRESS_TRIGGER_BYTES) return file;
+
+  let bitmap;
+  try {
+    bitmap = await globalThis.createImageBitmap(file);
+  } catch {
+    if (file.size <= IMAGE_UPLOAD_MAX_BYTES) return file;
+    throw new Error("Фото слишком большое, и браузер не смог его сжать. Загрузите JPG, PNG или WebP до 8 MB.");
+  }
+
+  const scale = Math.min(1, IMAGE_MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Браузер не смог подготовить изображение к загрузке");
+  context.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close?.();
+
+  let bestFile = file;
+  for (const quality of IMAGE_COMPRESSION_STEPS) {
+    const blob = await canvasToBlob(canvas, "image/jpeg", quality);
+    const compressed = new globalThis.File(
+      [blob],
+      `${safeStorageFileName(file.name).replace(/\.[^.]+$/, "")}_compressed.jpg`,
+      { type: "image/jpeg", lastModified: Date.now() }
+    );
+    bestFile = compressed;
+    if (compressed.size <= IMAGE_UPLOAD_MAX_BYTES) return compressed;
+  }
+
+  if (bestFile.size <= IMAGE_UPLOAD_MAX_BYTES) return bestFile;
+  throw new Error(`Фото слишком большое после сжатия (${formatFileSize(bestFile.size)}). Максимум ${formatFileSize(IMAGE_UPLOAD_MAX_BYTES)}.`);
+}
+
+async function prepareDocumentUploadFile(file) {
+  if (!file) throw new Error("Файл не выбран");
+  if (!isAllowedDocumentFile(file)) {
+    throw new Error("Можно загрузить только PDF или фото: JPG, PNG, WebP, HEIC.");
+  }
+  if (file.size > DOCUMENT_STORAGE_MAX_BYTES) {
+    throw new Error(`Файл слишком большой (${formatFileSize(file.size)}). Максимум ${formatFileSize(DOCUMENT_STORAGE_MAX_BYTES)}.`);
+  }
+  if (isPdfDocument(file)) {
+    if (file.size > PDF_UPLOAD_MAX_BYTES) {
+      throw new Error(`PDF слишком большой (${formatFileSize(file.size)}). Максимум ${formatFileSize(PDF_UPLOAD_MAX_BYTES)}.`);
+    }
+    return file;
+  }
+  if (isImageDocument(file)) {
+    const preparedFile = await compressImageDocument(file);
+    if (preparedFile.size > IMAGE_UPLOAD_MAX_BYTES) {
+      throw new Error(`Фото слишком большое (${formatFileSize(preparedFile.size)}). Максимум ${formatFileSize(IMAGE_UPLOAD_MAX_BYTES)}.`);
+    }
+    return preparedFile;
+  }
+  return file;
+}
+
 async function hydrateAttachmentUrl(attachment) {
   if (!attachment.storagePath || attachment.externalUrl) return attachment;
   const { data, error } = await supabase.storage
@@ -1845,15 +1956,15 @@ export default function RecruitingHub() {
 
   async function addManualDocument(candidate, documentType, file) {
     if (!workspace?.id) throw new Error("Workspace не инициализирован");
-    if (!file) throw new Error("Файл не выбран");
+    const uploadFile = await prepareDocumentUploadFile(file);
 
     const id = `att_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-    const fileName = safeStorageFileName(file.name || `${docLabels[documentType] || documentType}`);
+    const fileName = safeStorageFileName(uploadFile.name || `${docLabels[documentType] || documentType}`);
     const storagePath = `${workspace.id}/${candidate.id}/${id}/${fileName}`;
     const { error: uploadError } = await supabase.storage
       .from(DOCUMENTS_BUCKET)
-      .upload(storagePath, file, {
-        contentType: file.type || "application/octet-stream",
+      .upload(storagePath, uploadFile, {
+        contentType: uploadFile.type || "application/octet-stream",
         upsert: false
       });
     if (uploadError) throw uploadError;
@@ -1866,9 +1977,9 @@ export default function RecruitingHub() {
       message_id: `manual_${id}`,
       direction: "incoming",
       document_type: documentType,
-      file_name: file.name || docLabels[documentType] || documentType,
-      mime_type: file.type || "",
-      size_bytes: file.size || null,
+      file_name: uploadFile.name || docLabels[documentType] || documentType,
+      mime_type: uploadFile.type || "",
+      size_bytes: uploadFile.size || null,
       storage_path: storagePath,
       raw_payload: {}
     };
@@ -2812,6 +2923,7 @@ function CandidateDocuments({ candidate, attachments, addManualDocument, deleteC
                   {uploadingType === key ? t("uploadingDocument") : t("addDocument")}
                   <input
                     type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
                     hidden
                     disabled={uploadingType === key}
                     onChange={async (event) => {

@@ -469,7 +469,7 @@ values (
   'candidate-documents',
   'candidate-documents',
   false,
-  26214400,
+  15728640,
   array[
     'application/pdf',
     'application/octet-stream',
