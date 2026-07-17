@@ -165,6 +165,9 @@ small { color: var(--muted); }
 .segmented { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: #fbfbfa; }
 .segmented button { border: 0; background: transparent; border-radius: 9px; padding: 7px 10px; font-size: 12px; font-weight: 850; color: var(--muted); }
 .segmented button.active { background: var(--yellow); color: var(--ink); }
+.analytics-controls { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.analytics-controls label { width: 154px; }
+.analytics-controls input { padding: 8px 10px; border-radius: 10px; font-size: 12px; font-weight: 800; }
 .analytics-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .analytics-kpis .stat-card { min-height: 118px; }
 .analytics-kpis .stat-value { font-size: 26px; }
