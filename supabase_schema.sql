@@ -464,6 +464,27 @@ create index if not exists idx_quo_live_calls_workspace_status on public.quo_liv
 create index if not exists idx_quo_live_calls_call_id on public.quo_live_calls(workspace_id, call_id);
 create index if not exists idx_quo_live_calls_candidate_id on public.quo_live_calls(candidate_id);
 
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'candidate-documents',
+  'candidate-documents',
+  false,
+  26214400,
+  array[
+    'application/pdf',
+    'application/octet-stream',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'image/heic',
+    'image/heif'
+  ]
+)
+on conflict (id) do update
+set public = false,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
 create or replace function public.create_candidate_defaults()
 returns trigger
 language plpgsql
@@ -872,6 +893,66 @@ with check (
   exists (
     select 1 from public.workspaces w
     where w.id = quo_call_events.workspace_id
+      and w.owner_user_id = auth.uid()
+  )
+);
+
+drop policy if exists "ownerhub read candidate document files" on storage.objects;
+create policy "ownerhub read candidate document files"
+on storage.objects for select
+to authenticated
+using (
+  bucket_id = 'candidate-documents'
+  and exists (
+    select 1 from public.workspaces w
+    where w.id::text = split_part(storage.objects.name, '/', 1)
+      and w.owner_user_id = auth.uid()
+  )
+);
+
+drop policy if exists "ownerhub insert candidate document files" on storage.objects;
+create policy "ownerhub insert candidate document files"
+on storage.objects for insert
+to authenticated
+with check (
+  bucket_id = 'candidate-documents'
+  and exists (
+    select 1 from public.workspaces w
+    where w.id::text = split_part(storage.objects.name, '/', 1)
+      and w.owner_user_id = auth.uid()
+  )
+);
+
+drop policy if exists "ownerhub update candidate document files" on storage.objects;
+create policy "ownerhub update candidate document files"
+on storage.objects for update
+to authenticated
+using (
+  bucket_id = 'candidate-documents'
+  and exists (
+    select 1 from public.workspaces w
+    where w.id::text = split_part(storage.objects.name, '/', 1)
+      and w.owner_user_id = auth.uid()
+  )
+)
+with check (
+  bucket_id = 'candidate-documents'
+  and exists (
+    select 1 from public.workspaces w
+    where w.id::text = split_part(storage.objects.name, '/', 1)
+      and w.owner_user_id = auth.uid()
+  )
+);
+
+drop policy if exists "ownerhub delete candidate document files" on storage.objects;
+create policy "ownerhub delete candidate document files"
+on storage.objects for delete
+to authenticated
+using (
+  bucket_id = 'candidate-documents'
+  and exists (
+    select 1 from public.workspaces w
+    where w.id::text = split_part(storage.objects.name, '/', 1)
       and w.owner_user_id = auth.uid()
   )
 );

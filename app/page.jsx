@@ -12,6 +12,8 @@ import {
   statuses
 } from "../lib/recruitingData";
 
+const DOCUMENTS_BUCKET = "candidate-documents";
+
 const defaultSettings = {
   companyName: "Sofia Logistics LLC",
   hubName: "OwnerHub HRM",
@@ -131,6 +133,7 @@ const interfaceCopy = {
     unassignedDocument: "Не назначено",
     receivedFromQuo: "Получено из Quo message",
     addDocument: "Добавить",
+    uploadingDocument: "Загружаем...",
     documentLinkPrompt: "Вставьте ссылку на документ",
     deleteDocumentConfirm: "Удалить этот документ из карточки?",
     deleteFile: "Удалить файл",
@@ -415,6 +418,7 @@ const interfaceCopy = {
     unassignedDocument: "Unassigned",
     receivedFromQuo: "Received from Quo message",
     addDocument: "Add",
+    uploadingDocument: "Uploading...",
     documentLinkPrompt: "Paste document link",
     deleteDocumentConfirm: "Delete this document from the profile?",
     deleteFile: "Delete file",
@@ -1098,6 +1102,28 @@ function mapCandidateAttachment(row) {
   };
 }
 
+const safeStorageFileName = (name) => {
+  const cleaned = String(name || "document")
+    .trim()
+    .replace(/[^\w.-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return cleaned || "document";
+};
+
+async function hydrateAttachmentUrl(attachment) {
+  if (!attachment.storagePath || attachment.externalUrl) return attachment;
+  const { data, error } = await supabase.storage
+    .from(DOCUMENTS_BUCKET)
+    .createSignedUrl(attachment.storagePath, 24 * 60 * 60);
+  if (error) return attachment;
+  return { ...attachment, externalUrl: data?.signedUrl || "" };
+}
+
+async function hydrateAttachmentUrls(rows) {
+  const mapped = (rows || []).map(mapCandidateAttachment);
+  return Promise.all(mapped.map(hydrateAttachmentUrl));
+}
+
 function mapQuoLiveCall(row) {
   return {
     id: row.id,
@@ -1586,6 +1612,10 @@ export default function RecruitingHub() {
       if (errors.length) throw errors[0];
 
       const settingsRow = settingsResult.data;
+      const attachmentRows = attachmentsResult.error?.code === "42P01"
+        ? []
+        : await hydrateAttachmentUrls(attachmentsResult.data || []);
+
       setDb({
         settings: settingsRow
           ? {
@@ -1614,7 +1644,7 @@ export default function RecruitingHub() {
         activities: (activitiesResult.data || []).map(mapActivity),
         knowledge: knowledgeRows.map(mapKnowledgeItem),
         quoCalls: quoCallsResult.error?.code === "42P01" ? [] : (quoCallsResult.data || []).map(mapQuoCallEvent),
-        attachments: attachmentsResult.error?.code === "42P01" ? [] : (attachmentsResult.data || []).map(mapCandidateAttachment)
+        attachments: attachmentRows
       });
     } catch (error) {
       notify(error.message || "Не удалось загрузить данные Supabase");
@@ -1776,9 +1806,10 @@ export default function RecruitingHub() {
       nextDocStatus = "received";
     }
 
+    const nextAttachment = await hydrateAttachmentUrl(mapCandidateAttachment(data));
     setDb((current) => ({
       ...current,
-      attachments: current.attachments.map((item) => (item.id === attachment.id ? mapCandidateAttachment(data) : item)),
+      attachments: current.attachments.map((item) => (item.id === attachment.id ? nextAttachment : item)),
       candidates: nextDocStatus
         ? current.candidates.map((candidate) => (
             candidate.id === attachment.candidateId
@@ -1791,6 +1822,13 @@ export default function RecruitingHub() {
 
   async function deleteAttachment(attachment) {
     if (!workspace?.id) throw new Error("Workspace не инициализирован");
+    if (attachment.storagePath) {
+      const { error: storageError } = await supabase.storage
+        .from(DOCUMENTS_BUCKET)
+        .remove([attachment.storagePath]);
+      if (storageError) throw storageError;
+    }
+
     const { error } = await supabase
       .from("candidate_attachments")
       .delete()
@@ -1805,9 +1843,21 @@ export default function RecruitingHub() {
     }));
   }
 
-  async function addManualDocument(candidate, documentType, externalUrl) {
+  async function addManualDocument(candidate, documentType, file) {
     if (!workspace?.id) throw new Error("Workspace не инициализирован");
+    if (!file) throw new Error("Файл не выбран");
+
     const id = `att_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    const fileName = safeStorageFileName(file.name || `${docLabels[documentType] || documentType}`);
+    const storagePath = `${workspace.id}/${candidate.id}/${id}/${fileName}`;
+    const { error: uploadError } = await supabase.storage
+      .from(DOCUMENTS_BUCKET)
+      .upload(storagePath, file, {
+        contentType: file.type || "application/octet-stream",
+        upsert: false
+      });
+    if (uploadError) throw uploadError;
+
     const row = {
       id,
       workspace_id: workspace.id,
@@ -1816,8 +1866,10 @@ export default function RecruitingHub() {
       message_id: `manual_${id}`,
       direction: "incoming",
       document_type: documentType,
-      file_name: docLabels[documentType] || documentType,
-      external_url: externalUrl,
+      file_name: file.name || docLabels[documentType] || documentType,
+      mime_type: file.type || "",
+      size_bytes: file.size || null,
+      storage_path: storagePath,
       raw_payload: {}
     };
 
@@ -1826,7 +1878,10 @@ export default function RecruitingHub() {
       .insert(row)
       .select("*")
       .single();
-    if (error) throw error;
+    if (error) {
+      await supabase.storage.from(DOCUMENTS_BUCKET).remove([storagePath]);
+      throw error;
+    }
 
     const { error: docError } = await supabase
       .from("candidate_documents")
@@ -1836,12 +1891,17 @@ export default function RecruitingHub() {
         document_type: documentType,
         status: "received"
       }, { onConflict: "candidate_id,document_type" });
-    if (docError) throw docError;
+    if (docError) {
+      await supabase.from("candidate_attachments").delete().eq("workspace_id", workspace.id).eq("id", id);
+      await supabase.storage.from(DOCUMENTS_BUCKET).remove([storagePath]);
+      throw docError;
+    }
 
     await addActivity(candidate.id, `${docLabels[documentType] || documentType}: added manually`, "document");
+    const nextAttachment = await hydrateAttachmentUrl(mapCandidateAttachment(data));
     setDb((current) => ({
       ...current,
-      attachments: [mapCandidateAttachment(data), ...current.attachments],
+      attachments: [nextAttachment, ...current.attachments],
       candidates: current.candidates.map((item) => (
         item.id === candidate.id
           ? { ...item, docs: { ...item.docs, [documentType]: "received" } }
@@ -1852,6 +1912,22 @@ export default function RecruitingHub() {
 
   async function deleteCandidateDocument(candidate, documentType) {
     if (!workspace?.id) throw new Error("Workspace не инициализирован");
+    const { data: attachmentsToDelete, error: fetchError } = await supabase
+      .from("candidate_attachments")
+      .select("storage_path")
+      .eq("workspace_id", workspace.id)
+      .eq("candidate_id", candidate.id)
+      .eq("document_type", documentType);
+    if (fetchError) throw fetchError;
+
+    const storagePaths = (attachmentsToDelete || []).map((item) => item.storage_path).filter(Boolean);
+    if (storagePaths.length) {
+      const { error: storageError } = await supabase.storage
+        .from(DOCUMENTS_BUCKET)
+        .remove(storagePaths);
+      if (storageError) throw storageError;
+    }
+
     const { error } = await supabase
       .from("candidate_attachments")
       .delete()
@@ -2262,9 +2338,9 @@ export default function RecruitingHub() {
                   notify(error.message);
                 }
               }}
-              addManualDocument={async (candidate, documentType, externalUrl) => {
+              addManualDocument={async (candidate, documentType, file) => {
                 try {
-                  await addManualDocument(candidate, documentType, externalUrl);
+                  await addManualDocument(candidate, documentType, file);
                   notify("Сохранено");
                 } catch (error) {
                   notify(error.message);
@@ -2706,8 +2782,9 @@ function CandidateProfile({ candidate, activities, quoCalls, attachments, update
 
 function CandidateDocuments({ candidate, attachments, addManualDocument, deleteCandidateDocument }) {
   const { t } = useI18n();
+  const [uploadingType, setUploadingType] = useState("");
   const attachmentsByType = (attachments || []).reduce((acc, attachment) => {
-    if (!attachment.documentType || !attachment.externalUrl) return acc;
+    if (!attachment.documentType || (!attachment.externalUrl && !attachment.storagePath)) return acc;
     const existing = acc[attachment.documentType];
     if (!existing || new Date(attachment.createdAt || 0) > new Date(existing.createdAt || 0)) {
       acc[attachment.documentType] = attachment;
@@ -2723,7 +2800,7 @@ function CandidateDocuments({ candidate, attachments, addManualDocument, deleteC
           const attachment = attachmentsByType[key];
           return (
             <div className={`doc-row ${attachment ? "doc-row-received" : ""}`} key={key}>
-              {attachment ? (
+              {attachment?.externalUrl ? (
                 <a className="doc-link" href={attachment.externalUrl} target="_blank" rel="noreferrer">{label}</a>
               ) : (
                 <strong>{label}</strong>
@@ -2731,10 +2808,27 @@ function CandidateDocuments({ candidate, attachments, addManualDocument, deleteC
               {attachment ? (
                 <button className="btn btn-small btn-danger doc-action" onClick={() => window.confirm(t("deleteDocumentConfirm")) && deleteCandidateDocument(candidate, key)}>{t("delete")}</button>
               ) : (
-                <button className="btn btn-small doc-action" onClick={() => {
-                  const url = window.prompt(t("documentLinkPrompt"));
-                  if (url?.trim()) addManualDocument(candidate, key, url.trim());
-                }}>{t("addDocument")}</button>
+                <label className={`btn btn-small doc-action ${uploadingType === key ? "is-disabled" : ""}`}>
+                  {uploadingType === key ? t("uploadingDocument") : t("addDocument")}
+                  <input
+                    type="file"
+                    hidden
+                    disabled={uploadingType === key}
+                    onChange={async (event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      if (!file) return;
+                      setUploadingType(key);
+                      try {
+                        await addManualDocument(candidate, key, file);
+                      } catch (error) {
+                        window.alert(error.message || "Failed to upload document");
+                      } finally {
+                        setUploadingType("");
+                      }
+                    }}
+                  />
+                </label>
               )}
             </div>
           );
