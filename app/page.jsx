@@ -253,9 +253,6 @@ const interfaceCopy = {
     ,
     analyticsTitle: "Продуктивность HR",
     analyticsNote: "Звонки по лидам в системе, время разговора, follow-ups и реальные касания по дням.",
-    periodToday: "Сегодня",
-    period7Days: "7 дней",
-    period30Days: "30 дней",
     callsMade: "Звонков",
     talkTime: "Время разговора",
     leadsTouched: "Лидов в работе",
@@ -266,7 +263,8 @@ const interfaceCopy = {
     productiveCallsNote: "Разговор 2+ мин или есть summary/запись",
     dailyBreakdown: "Разбивка по дням",
     dailyBreakdownNote: "Реальная работа HR по дням без массового импорта",
-    selectedDate: "Дата",
+    dateFrom: "От",
+    dateTo: "До",
     day: "День",
     newLeadsMetric: "Новые лиды",
     touchedLeadsMetric: "Лиды в работе",
@@ -539,9 +537,6 @@ const interfaceCopy = {
     noComment: "No comment",
     analyticsTitle: "HR Productivity",
     analyticsNote: "Calls linked to system leads, talk time, follow-ups, and real touches by day.",
-    periodToday: "Today",
-    period7Days: "7 days",
-    period30Days: "30 days",
     callsMade: "Calls",
     talkTime: "Talk time",
     leadsTouched: "Leads touched",
@@ -552,7 +547,8 @@ const interfaceCopy = {
     productiveCallsNote: "Talk time 2+ min or has summary/recording",
     dailyBreakdown: "Daily breakdown",
     dailyBreakdownNote: "Real HR work by day without bulk imports",
-    selectedDate: "Date",
+    dateFrom: "From",
+    dateTo: "To",
     day: "Day",
     newLeadsMetric: "New leads",
     touchedLeadsMetric: "Touched leads",
@@ -863,16 +859,23 @@ function formatDuration(seconds) {
   return `${minutes || 1}m`;
 }
 
-function buildDateRange(days, endDateValue = new Date().toISOString()) {
-  const endDate = new Date(String(endDateValue).length === 10 ? `${endDateValue}T12:00:00` : endDateValue);
-  if (Number.isNaN(endDate.getTime())) return buildDateRange(days);
+function buildDateRangeBetween(fromDateValue, toDateValue) {
+  const fallback = todayISO();
+  let startDate = new Date(`${fromDateValue || fallback}T12:00:00`);
+  let endDate = new Date(`${toDateValue || fromDateValue || fallback}T12:00:00`);
+  if (Number.isNaN(startDate.getTime())) startDate = new Date(`${fallback}T12:00:00`);
+  if (Number.isNaN(endDate.getTime())) endDate = new Date(`${fallback}T12:00:00`);
+  if (startDate > endDate) [startDate, endDate] = [endDate, startDate];
+
+  const dates = [];
+  const current = new Date(startDate);
+  current.setHours(12, 0, 0, 0);
   endDate.setHours(12, 0, 0, 0);
-  return Array.from({ length: days }, (_, index) => {
-    const date = new Date(endDate);
-    date.setHours(12, 0, 0, 0);
-    date.setDate(date.getDate() - (days - index - 1));
-    return localDateKey(date.toISOString());
-  });
+  while (current <= endDate) {
+    dates.push(localDateKey(current.toISOString()));
+    current.setDate(current.getDate() + 1);
+  }
+  return dates;
 }
 
 function getPath(obj, path) {
@@ -3520,9 +3523,19 @@ function FollowColumn({ title, list, db, openCandidate, completeFollowup, snooze
 
 function AnalyticsView({ db }) {
   const { t } = useI18n();
-  const [period, setPeriod] = useState(7);
-  const [selectedDate, setSelectedDate] = useState(todayISO());
-  const analytics = useMemo(() => buildAnalytics(db, period, selectedDate), [db, period, selectedDate]);
+  const [fromDate, setFromDate] = useState(addDays(-6));
+  const [toDate, setToDate] = useState(todayISO());
+  const analytics = useMemo(() => buildAnalytics(db, fromDate, toDate), [db, fromDate, toDate]);
+  const updateFromDate = (value) => {
+    const nextDate = value || todayISO();
+    setFromDate(nextDate);
+    if (nextDate > toDate) setToDate(nextDate);
+  };
+  const updateToDate = (value) => {
+    const nextDate = value || todayISO();
+    setToDate(nextDate);
+    if (nextDate < fromDate) setFromDate(nextDate);
+  };
 
   return (
     <div className="grid">
@@ -3532,16 +3545,8 @@ function AnalyticsView({ db }) {
           note={t("analyticsNote")}
           action={(
             <div className="analytics-controls">
-              <label>{t("selectedDate")}<input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value || todayISO())} /></label>
-              <div className="segmented">
-                {[
-                  [1, t("periodToday")],
-                  [7, t("period7Days")],
-                  [30, t("period30Days")]
-                ].map(([value, label]) => (
-                  <button key={value} className={period === value ? "active" : ""} onClick={() => setPeriod(value)}>{label}</button>
-                ))}
-              </div>
+              <label>{t("dateFrom")}<input type="date" value={fromDate} max={toDate} onChange={(event) => updateFromDate(event.target.value)} /></label>
+              <label>{t("dateTo")}<input type="date" value={toDate} min={fromDate} onChange={(event) => updateToDate(event.target.value)} /></label>
             </div>
           )}
         />
@@ -3601,8 +3606,8 @@ function AnalyticsView({ db }) {
   );
 }
 
-function buildAnalytics(db, period, selectedDate) {
-  const dateKeys = buildDateRange(period, selectedDate);
+function buildAnalytics(db, fromDate, toDate) {
+  const dateKeys = buildDateRangeBetween(fromDate, toDate);
   const days = dateKeys.map((date) => createAnalyticsDay(date));
   const dayMap = Object.fromEntries(days.map((day) => [day.date, day]));
 
