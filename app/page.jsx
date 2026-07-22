@@ -260,7 +260,7 @@ const interfaceCopy = {
     followupsDone: "Follow-ups выполнено",
     productiveCalls: "Результативные звонки",
     activeWorkWindow: "Рабочее окно",
-    productiveCallsNote: "Разговор 2+ мин или есть summary/запись",
+    productiveCallsNote: "Разговор длительностью 2+ минуты",
     dailyBreakdown: "Разбивка по дням",
     dailyBreakdownNote: "Реальная работа HR по дням без массового импорта",
     dateFrom: "От",
@@ -544,7 +544,7 @@ const interfaceCopy = {
     followupsDone: "Follow-ups done",
     productiveCalls: "Productive calls",
     activeWorkWindow: "Work window",
-    productiveCallsNote: "Talk time 2+ min or has summary/recording",
+    productiveCallsNote: "Call duration is 2+ minutes",
     dailyBreakdown: "Daily breakdown",
     dailyBreakdownNote: "Real HR work by day without bulk imports",
     dateFrom: "From",
@@ -3656,7 +3656,7 @@ function buildAnalytics(db, fromDate, toDate) {
     if (call.summary.length || call.nextSteps.length) day.summaries += 1;
     if (call.recordingUrl) day.recordings += 1;
     if (call.answeredAt) day.answered += 1;
-    if (duration >= 120 || call.summary.length || call.nextSteps.length || call.recordingUrl) day.productiveCalls += 1;
+    if (isProductiveCallDuration(duration)) day.productiveCalls += 1;
   });
 
   days.forEach((day) => {
@@ -3741,9 +3741,13 @@ function isProductiveActivity(activity) {
 }
 
 function callDurationSeconds(call) {
-  const timed = secondsBetween(call.answeredAt, call.completedAt);
-  if (timed) return timed;
-  return Math.max(0, Math.round(Number(call.recordingDuration) || 0));
+  const recorded = Math.max(0, Math.round(Number(call.recordingDuration) || 0));
+  if (recorded) return recorded;
+  return secondsBetween(call.answeredAt, call.completedAt);
+}
+
+function isProductiveCallDuration(seconds) {
+  return Math.max(0, Math.round(Number(seconds) || 0)) >= 120;
 }
 
 const settingsDraftKey = (workspaceId) => `ownerhub_settings_draft_${workspaceId}`;
