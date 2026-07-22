@@ -106,6 +106,8 @@ const interfaceCopy = {
     currentGeography: "География текущей базы",
     workFormatDistribution: "Распределение по формату",
     workFormatNote: "Local, OTR и универсальные кандидаты",
+    back: "Назад",
+    backTo: "Назад: {{page}}",
     candidate: "Кандидат",
     location: "Локация",
     format: "Формат",
@@ -391,6 +393,8 @@ const interfaceCopy = {
     currentGeography: "Current database geography",
     workFormatDistribution: "Work Format Distribution",
     workFormatNote: "Local, OTR, and flexible candidates",
+    back: "Back",
+    backTo: "Back to {{page}}",
     candidate: "Candidate",
     location: "Location",
     format: "Format",
@@ -1536,6 +1540,7 @@ export default function RecruitingHub() {
       view: "dashboard",
       selectedCandidateId: null,
       callCandidateId: null,
+      navStack: [],
       pipelineSearch: "",
       followFilter: "open",
       ...hashUi,
@@ -2336,6 +2341,36 @@ export default function RecruitingHub() {
 
   const title = titleForView(ui.view, t);
   const activeLiveCall = liveCalls.find((call) => call.direction === "incoming" || !call.direction) || null;
+  const snapshotUi = (current) => ({
+    view: current.view,
+    selectedCandidateId: current.selectedCandidateId,
+    callCandidateId: current.callCandidateId,
+    filters: current.filters,
+    followFilter: current.followFilter
+  });
+  const pushNavigation = (current) => [...(current.navStack || []), snapshotUi(current)].slice(-8);
+  const openCandidateProfile = (candidateId) => setUi((current) => ({
+    ...current,
+    view: "candidate",
+    selectedCandidateId: candidateId,
+    callCandidateId: null,
+    navStack: pushNavigation(current)
+  }));
+  const openCallScript = (candidateId) => setUi((current) => ({
+    ...current,
+    view: "calls",
+    callCandidateId: candidateId,
+    navStack: pushNavigation(current)
+  }));
+  const goBack = () => setUi((current) => {
+    const navStack = [...(current.navStack || [])];
+    const target = navStack.pop();
+    if (!target) return { ...current, view: "dashboard", selectedCandidateId: null, callCandidateId: null, navStack: [] };
+    return { ...current, ...target, navStack };
+  });
+  const backTarget = ui.navStack?.length ? ui.navStack[ui.navStack.length - 1] : null;
+  const backTitle = backTarget ? titleForView(backTarget.view, t)[0] : "";
+  const showBackButton = Boolean(backTarget && ["candidate", "calls"].includes(ui.view));
 
   return (
     <I18nContext.Provider value={{ lang: interfaceLanguage, t }}>
@@ -2359,7 +2394,7 @@ export default function RecruitingHub() {
             <button
               key={view}
               className={`nav-btn ${ui.view === view ? "active" : ""}`}
-              onClick={() => setUi((current) => ({ ...current, view, selectedCandidateId: view === "candidate" ? current.selectedCandidateId : null }))}
+              onClick={() => setUi((current) => ({ ...current, view, selectedCandidateId: null, callCandidateId: view === "calls" ? current.callCandidateId : null, navStack: [] }))}
             >
               <span className="nav-icon">{icon}</span>
               {label}
@@ -2373,9 +2408,14 @@ export default function RecruitingHub() {
       </aside>
       <main className="main">
         <header className="topbar">
-          <div>
-            <div className="page-title">{title[0]}</div>
-            <div className="page-subtitle">{title[1]}</div>
+          <div className="top-title-group">
+            {showBackButton ? (
+              <button className="btn icon-btn back-btn" onClick={goBack} title={t("backTo", { page: backTitle })} aria-label={t("backTo", { page: backTitle })}>←</button>
+            ) : null}
+            <div>
+              <div className="page-title">{title[0]}</div>
+              <div className="page-subtitle">{title[1]}</div>
+            </div>
           </div>
           <div className="top-actions">
             <button className="btn desktop-only" onClick={() => setModal({ type: "followup" })}>＋ {t("addFollowup")}</button>
@@ -2385,8 +2425,8 @@ export default function RecruitingHub() {
         <LiveCallBanner
           call={activeLiveCall}
           candidates={db.candidates}
-          openCandidate={(candidateId) => setUi((current) => ({ ...current, view: "candidate", selectedCandidateId: candidateId }))}
-          openScript={(candidateId) => setUi((current) => ({ ...current, view: "calls", callCandidateId: candidateId }))}
+          openCandidate={openCandidateProfile}
+          openScript={openCallScript}
           addCandidate={(phone) => setModal({ type: "candidate", candidate: { ...blankCandidate(), phone, source: "Quo Incoming Call" }, startCallAfter: false })}
         />
         <section className="content">
@@ -2394,7 +2434,7 @@ export default function RecruitingHub() {
           {ui.view === "dashboard" && (
             <Dashboard
               db={db}
-              openCandidate={(id) => setUi((current) => ({ ...current, view: "candidate", selectedCandidateId: id }))}
+              openCandidate={openCandidateProfile}
               openFollowup={() => setModal({ type: "followup" })}
               openStatus={(status) => setUi((current) => ({
                 ...current,
@@ -2409,9 +2449,9 @@ export default function RecruitingHub() {
               db={db}
               ui={ui}
               setUi={setUi}
-              openCandidate={(id) => setUi((current) => ({ ...current, view: "candidate", selectedCandidateId: id }))}
+              openCandidate={openCandidateProfile}
               editCandidate={(candidate) => setModal({ type: "candidate", candidate })}
-              startCall={(candidateId) => setUi((current) => ({ ...current, view: "calls", callCandidateId: candidateId }))}
+              startCall={openCallScript}
               addFollowup={(candidateId) => setModal({ type: "followup", candidateId })}
               importCsv={() => setModal({ type: "csvImport" })}
               updateStatus={updateCandidateStatus}
@@ -2468,7 +2508,7 @@ export default function RecruitingHub() {
               editCandidate={(candidate) => setModal({ type: "candidate", candidate })}
               addFollowup={(candidateId) => setModal({ type: "followup", candidateId })}
               deleteCandidate={deleteCandidate}
-              startCall={(candidateId) => setUi((current) => ({ ...current, view: "calls", callCandidateId: candidateId }))}
+              startCall={openCallScript}
             />
           )}
           {ui.view === "calls" && (
@@ -2490,7 +2530,7 @@ export default function RecruitingHub() {
               candidates={db.candidates}
               ui={ui}
               setUi={setUi}
-              openCandidate={(id) => setUi((current) => ({ ...current, view: "candidate", selectedCandidateId: id }))}
+              openCandidate={openCandidateProfile}
               updateStatus={updateCandidateStatus}
             />
           )}
@@ -2499,7 +2539,7 @@ export default function RecruitingHub() {
               db={db}
               ui={ui}
               setUi={setUi}
-              openCandidate={(id) => setUi((current) => ({ ...current, view: "candidate", selectedCandidateId: id }))}
+              openCandidate={openCandidateProfile}
               completeFollowup={completeFollowup}
               snoozeFollowup={snoozeFollowup}
               addFollowup={() => setModal({ type: "followup" })}
@@ -2523,7 +2563,8 @@ export default function RecruitingHub() {
                 ...current,
                 view: modal.startCallAfter ? "calls" : "candidate",
                 callCandidateId: modal.startCallAfter ? saved.id : current.callCandidateId,
-                selectedCandidateId: modal.startCallAfter ? current.selectedCandidateId : saved.id
+                selectedCandidateId: modal.startCallAfter ? current.selectedCandidateId : saved.id,
+                navStack: modal.startCallAfter || current.view === "candidate" ? current.navStack : pushNavigation(current)
               }));
               notify(exists ? "Кандидат обновлён" : "Кандидат добавлен");
             } catch (error) {
@@ -3345,7 +3386,12 @@ function CallsView({ db, ui, setUi, saveCandidate, createFollowup, notify, openN
       const answers = nextCandidate.call.answers;
       if (answers.followDate) await createFollowup(nextCandidate.id, answers.followDate, answers.followTime || "10:00", answers.preferredContact || "Call", answers.followNote || "Follow-up после квалификационного звонка");
       if (outcome === "message" && !answers.followDate) await createFollowup(nextCandidate.id, addDays(1), "10:00", answers.preferredContact || "Message", "Проверить реакцию после отправки информации");
-      setUi((current) => ({ ...current, view: "candidate", selectedCandidateId: nextCandidate.id, callCandidateId: null }));
+      setUi((current) => {
+        const navStack = [...(current.navStack || [])];
+        const backTarget = navStack[navStack.length - 1];
+        if (backTarget?.view === "candidate" && backTarget.selectedCandidateId === nextCandidate.id) navStack.pop();
+        return { ...current, view: "candidate", selectedCandidateId: nextCandidate.id, callCandidateId: null, navStack };
+      });
       notify("Звонок сохранён в карточке кандидата");
     } catch (error) {
       notify(error.message);
@@ -4466,10 +4512,15 @@ function Empty({ title, note }) {
 
 function FollowItem({ followup, candidate, openCandidate, completeFollowup, snoozeFollowup }) {
   const { t } = useI18n();
+  const note = followup.note || t("noComment");
   return (
     <div className="follow-item">
       <div className="follow-time">{followup.time || "-"}<div>{fmtDate(followup.date).split(" ").slice(0, 2).join(" ")}</div></div>
-      <div className="follow-main" onClick={() => candidate && openCandidate?.(candidate.id)}><strong>{candidate ? fullName(candidate) : t("deletedCandidate")}</strong><span>{followup.type} · {followup.note || t("noComment")}</span></div>
+      <div className="follow-main" onClick={() => candidate && openCandidate?.(candidate.id)} title={`${followup.type}: ${note}`}>
+        <strong>{candidate ? fullName(candidate) : t("deletedCandidate")}</strong>
+        <span className="follow-type">{followup.type}</span>
+        <span className="follow-note">{note}</span>
+      </div>
       {followup.status === "open" && completeFollowup ? <div className="follow-actions"><button className="btn btn-small" onClick={() => completeFollowup(followup.id)}>✓</button><button className="btn btn-small" onClick={() => snoozeFollowup(followup.id)}>+1</button></div> : followup.status === "done" ? <span className="badge badge-green">Done</span> : null}
     </div>
   );
