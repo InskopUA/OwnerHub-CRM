@@ -2880,6 +2880,7 @@ function CandidateProfile({ candidate, activities, quoCalls, attachments, update
   const progressIndex = Math.max(0, pipelineStatuses.indexOf(candidate.status));
   const progress = Math.min(100, Math.round((progressIndex / (pipelineStatuses.length - 2)) * 100));
   const { comments, legacyQuoBlocks } = splitCandidateNotes(candidate.notes);
+  const candidateLocation = [candidate.city, candidate.state, candidate.zip].filter(Boolean).join(", ");
   const realQuoCalls = (quoCalls || []).filter((call) => call.summary.length || call.nextSteps.length || call.recordingUrl);
   const legacyQuoCalls = realQuoCalls.length ? [] : legacyQuoBlocks.map((block, index) => ({
     id: `legacy_quo_${index}`,
@@ -2893,7 +2894,7 @@ function CandidateProfile({ candidate, activities, quoCalls, attachments, update
       <div className="candidate-head">
         <div className="candidate-head-inner">
           <div className="candidate-big-avatar">{initials(candidate)}</div>
-          <div><div className="candidate-title">{fullName(candidate)}</div><div className="candidate-meta">{[candidate.city, candidate.state, candidate.zip].filter(Boolean).join(", ") || "Локация не указана"} · {candidate.workPreference || "Формат не выбран"} · Lead Score {candidate.score}</div></div>
+          <div><div className="candidate-title">{fullName(candidate)}</div><div className="candidate-meta">{candidateLocation || t("location")} · {candidate.workPreference || "Формат не выбран"} · Lead Score {candidate.score}</div></div>
           <div className="candidate-head-actions">
             <button className="btn" onClick={() => startCall(candidate.id)}>☎ {t("callScript")}</button>
             <button className="btn" onClick={() => editCandidate(candidate)}>✎ {t("edit")}</button>
@@ -2903,7 +2904,7 @@ function CandidateProfile({ candidate, activities, quoCalls, attachments, update
       </div>
       <div className="profile-grid">
         <div className="card">
-          <InfoSection title={<span>{t("contactPreferences")} <StatusBadge status={candidate.status} /></span>} items={[[t("phone"), candidate.phone], [t("email"), candidate.email], [t("language"), candidate.language], [t("source"), candidate.source], [t("format"), candidate.workPreference], [t("homeTime"), candidate.homeTime], [t("readyToStart"), fmtDate(candidate.startDate)], [t("daysPerWeek"), candidate.daysPerWeek], [t("expectedGross"), candidate.expectedGross]]} />
+          <InfoSection title={<span>{t("contactPreferences")} <StatusBadge status={candidate.status} /></span>} items={[[t("phone"), candidate.phone], [t("email"), candidate.email], [t("location"), candidateLocation], [t("language"), candidate.language], [t("source"), candidate.source], [t("format"), candidate.workPreference], [t("homeTime"), candidate.homeTime], [t("readyToStart"), fmtDate(candidate.startDate)], [t("daysPerWeek"), candidate.daysPerWeek], [t("expectedGross"), candidate.expectedGross]]} />
           <InfoSection title={t("driver")} items={[["CDL", candidate.cdl], ["License type", candidate.licenseType], [t("experience"), candidate.experienceYears ? `${candidate.experienceYears} years` : ""], ["Car hauling", candidate.carHaulingYears ? `${candidate.carHaulingYears} years` : ""], ["Two-car experience", candidate.twoCarExperience], ["Medical Card", candidate.medicalCard], [t("accidents"), candidate.accidents], [t("violations"), candidate.violations], [t("insuranceRejection"), candidate.previousInsuranceRejection]]} />
           <InfoSection title="Truck" items={[["Марка / модель", [candidate.truck.make, candidate.truck.model].filter(Boolean).join(" ")], ["Год", candidate.truck.year], ["VIN", candidate.truck.vin], ["GVWR", candidate.truck.gvwr], ["Топливо", candidate.truck.fuel], ["Состояние", candidate.truck.condition], ["Инспекция", candidate.truck.inspection]]} />
           <InfoSection title="Trailer" items={[["Марка / модель", [candidate.trailer.make, candidate.trailer.model].filter(Boolean).join(" ")], ["Год", candidate.trailer.year], ["VIN", candidate.trailer.vin], ["Длина", candidate.trailer.length], ["GVWR", candidate.trailer.gvwr], ["Тип", candidate.trailer.type], ["Вместимость", `${candidate.trailer.capacity || "2"} cars`], ["Состояние", candidate.trailer.condition], ["Инспекция", candidate.trailer.inspection]]} />
